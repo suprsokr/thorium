@@ -29,8 +29,6 @@ type Config struct {
 	// Output settings
 	Output OutputConfig `json:"output"`
 
-	// Mod settings
-	Sync SyncConfig `json:"sync"`
 }
 
 // WoTLKConfig holds WoW client settings
@@ -65,10 +63,6 @@ type OutputConfig struct {
 	LuaXMLMPQ string `json:"luaxml_mpq"`
 }
 
-// SyncConfig holds mod synchronization settings
-type SyncConfig struct {
-	ItemMinEntry int `json:"item_min_entry"`
-}
 
 // Load loads and parses the config file, expanding environment variables
 func Load(path string) (*Config, error) {
@@ -169,10 +163,6 @@ func (c *Config) applyDefaults() {
 		c.Output.LuaXMLMPQ = "patch-{locale}-T.MPQ"
 	}
 
-	// Sync defaults
-	if c.Sync.ItemMinEntry == 0 {
-		c.Sync.ItemMinEntry = 90000
-	}
 }
 
 func getEnvOrDefault(key, defaultVal string) string {
@@ -268,9 +258,6 @@ func DefaultConfig() *Config {
 		Output: OutputConfig{
 			DBCMPQ:    "patch-T.MPQ",
 			LuaXMLMPQ: "patch-{locale}-T.MPQ",
-		},
-		Sync: SyncConfig{
-			ItemMinEntry: 90000,
 		},
 	}
 }
