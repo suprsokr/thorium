@@ -1,14 +1,49 @@
 # Installation
 
+## Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/suprsokr/thorium/releases):
+
+```bash
+# Linux x64
+curl -L https://github.com/suprsokr/thorium/releases/latest/download/thorium-linux-amd64 -o thorium
+chmod +x thorium
+sudo mv thorium /usr/local/bin/
+
+# Linux ARM64 (e.g., Raspberry Pi, AWS Graviton)
+curl -L https://github.com/suprsokr/thorium/releases/latest/download/thorium-linux-arm64 -o thorium
+
+# macOS Intel
+curl -L https://github.com/suprsokr/thorium/releases/latest/download/thorium-darwin-amd64 -o thorium
+
+# macOS Apple Silicon
+curl -L https://github.com/suprsokr/thorium/releases/latest/download/thorium-darwin-arm64 -o thorium
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/suprsokr/thorium/releases/latest/download/thorium-windows-amd64.exe -OutFile thorium.exe
+```
+
 ## From Source
 
 ```bash
-git clone --recursive https://github.com/suprsokr/thorium
+git clone --recursive https://github.com/suprsokr/thorium.git
 cd thorium
-make # `make install` for system-wide installation
+make          # Build with StormLib (recommended)
+make install  # Install to /usr/local/bin
 ```
 
-This builds a single `thorium` binary (~10MB) with everything included.
+This builds a single `thorium` binary (~10MB) with built-in MPQ support via StormLib.
+
+### Pure Go Build (No CGO)
+
+For cross-compilation or environments without C toolchain:
+
+```bash
+make build-pure    # Single platform
+make build-all     # All platforms (linux/darwin/windows, amd64/arm64)
+```
+
+Note: Pure Go builds require an external `mpqbuilder` tool for MPQ operations.
 
 ## Requirements
 

@@ -1,15 +1,15 @@
 # Thorium
 
-A TrinityCore 335 modding framework.
+A TrinityCore 3.3.5 modding framework.
 
-Thorium handles extracting, applying, repackaging and distributing DBCs, world database and client interface files. You write SQL for both DBC and world database edits, or edit extracted client interface files. It also optionally applies some binary patches to wow.exe that aide development.
+Thorium handles extracting, applying, repackaging and distributing DBCs, world database and client interface files. You write SQL for both DBC and world database edits, or edit auto-extracted client interface files. It also optionally applies some binary patches to wow.exe that aide development.
 
 Thorium does not help you:
 * Do anything with models, textures or maps (unless perhaps they are DBC or luaxml related).
 * Make Trinity Core edits.
 * Reverse engineer the client.
 
-Thorium is nice for a more minimalist modding framework that does not require a forked TrinityCore, but is more complete that combining fragmented tools. Additionally, this framework plays will with LLMs by allowing them to do what they are strong at (view/edit SQL, write luaxml code) without getting lost on what they simply don't know (extraction, application, repacking and distribution of those files).
+Thorium is nice for a more minimalist modding framework that does not require a forked TrinityCore, but is more complete than combining fragmented tools. Additionally, this framework plays well with LLMs by allowing them to do what they are strong at (view/edit SQL, write luaxml code) without getting lost on what they simply don't know (extraction, application, repacking and distribution of those files).
 
 ## Features
 
@@ -23,7 +23,7 @@ Thorium is nice for a more minimalist modding framework that does not require a 
 
 ## Install
 
-See [docs/install.md](docs/install.md) for detailed installation instructions, requirements, and configuration.
+See [docs/install.md](docs/install.md) for pre-built binaries or building from source.
 
 ## Quick Start
 
