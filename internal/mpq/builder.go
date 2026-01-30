@@ -7,12 +7,70 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"thorium-cli/internal/config"
+
+	gompq "github.com/suprsokr/go-mpq"
 )
+
+// Archive wraps go-mpq Archive for reading MPQ files
+type Archive struct {
+	*gompq.Archive
+}
+
+// Open opens an MPQ archive for reading
+func Open(path string) (*Archive, error) {
+	a, err := gompq.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return &Archive{a}, nil
+}
+
+// Extract extracts files matching a pattern from the archive
+func (a *Archive) Extract(pattern, outputDir string) ([]string, error) {
+	files, err := a.ListFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	var extracted []string
+	for _, file := range files {
+		if matchPattern(file, pattern) {
+			destPath := filepath.Join(outputDir, strings.ReplaceAll(file, "\\", string(os.PathSeparator)))
+			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+				return extracted, err
+			}
+			if err := a.ExtractFile(file, destPath); err != nil {
+				return extracted, fmt.Errorf("extract %s: %w", file, err)
+			}
+			extracted = append(extracted, file)
+		}
+	}
+	return extracted, nil
+}
+
+// matchPattern performs simple wildcard matching
+func matchPattern(name, pattern string) bool {
+	name = strings.ToLower(strings.ReplaceAll(name, "\\", "/"))
+	pattern = strings.ToLower(strings.ReplaceAll(pattern, "\\", "/"))
+
+	if pattern == "*" || pattern == "" {
+		return true
+	}
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") {
+		return strings.Contains(name, pattern[1:len(pattern)-1])
+	}
+	if strings.HasPrefix(pattern, "*") {
+		return strings.HasSuffix(name, pattern[1:])
+	}
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(name, pattern[:len(pattern)-1])
+	}
+	return name == pattern
+}
 
 // Builder builds MPQ archives
 type Builder struct {
@@ -68,21 +126,9 @@ func (b *Builder) PackageLuaXMLFromMods(files []ModifiedLuaXMLFile) (int, error)
 
 	// Ensure output directory exists
 	os.MkdirAll(filepath.Dir(outputPath), 0755)
-
-	// Try StormLib first (built-in)
-	if stormLibAvailable {
-		return b.packageLuaXMLFromModsStorm(files, outputPath)
-	}
-
-	// Fall back to external tool
-	return b.packageLuaXMLFromModsExternal(files, outputPath)
-}
-
-// packageLuaXMLFromModsStorm packages using StormLib
-func (b *Builder) packageLuaXMLFromModsStorm(files []ModifiedLuaXMLFile, outputPath string) (int, error) {
 	os.Remove(outputPath)
 
-	archive, err := CreateWithStorm(outputPath, len(files)+10)
+	archive, err := gompq.Create(outputPath, len(files)+10)
 	if err != nil {
 		return 0, err
 	}
@@ -98,37 +144,6 @@ func (b *Builder) packageLuaXMLFromModsStorm(files []ModifiedLuaXMLFile, outputP
 	return len(files), nil
 }
 
-// packageLuaXMLFromModsExternal packages using external tool
-func (b *Builder) packageLuaXMLFromModsExternal(files []ModifiedLuaXMLFile, outputPath string) (int, error) {
-	mpqbuilder, err := b.findMPQBuilder()
-	if err != nil {
-		return 0, err
-	}
-
-	// Create listfile
-	listfile, err := os.CreateTemp("", "thorium_luaxml_*.txt")
-	if err != nil {
-		return 0, fmt.Errorf("create listfile: %w", err)
-	}
-	defer os.Remove(listfile.Name())
-
-	for _, file := range files {
-		mpqPath := strings.ReplaceAll(file.RelPath, "/", "\\")
-		fmt.Fprintf(listfile, "%s\t%s\n", file.FilePath, mpqPath)
-	}
-	listfile.Close()
-
-	// Run mpqbuilder
-	cmd := exec.Command(mpqbuilder, listfile.Name(), outputPath)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return 0, fmt.Errorf("mpqbuilder: %w\n%s", err, stderr.String())
-	}
-
-	return len(files), nil
-}
 
 // PackageLuaXML packages LuaXML files into an MPQ (legacy - uses luaxml_out vs luaxml_source)
 func (b *Builder) PackageLuaXML() (int, error) {
@@ -198,22 +213,9 @@ func (b *Builder) CopyToServer() (int, error) {
 func (b *Builder) buildMPQ(sourceDir string, files []string, mpqPrefix, outputPath string) error {
 	// Ensure output directory exists
 	os.MkdirAll(filepath.Dir(outputPath), 0755)
-
-	// Try StormLib first (built-in)
-	if stormLibAvailable {
-		return b.buildMPQWithStorm(sourceDir, files, mpqPrefix, outputPath)
-	}
-
-	// Fall back to external mpqbuilder
-	return b.buildMPQExternal(sourceDir, files, mpqPrefix, outputPath)
-}
-
-// buildMPQWithStorm builds an MPQ using the built-in StormLib
-func (b *Builder) buildMPQWithStorm(sourceDir string, files []string, mpqPrefix, outputPath string) error {
-	// Remove existing file
 	os.Remove(outputPath)
 
-	archive, err := CreateWithStorm(outputPath, len(files)+10)
+	archive, err := gompq.Create(outputPath, len(files)+10)
 	if err != nil {
 		return err
 	}
@@ -226,39 +228,6 @@ func (b *Builder) buildMPQWithStorm(sourceDir string, files []string, mpqPrefix,
 		if err := archive.AddFile(srcPath, mpqPath); err != nil {
 			return fmt.Errorf("add %s: %w", file, err)
 		}
-	}
-
-	return nil
-}
-
-// buildMPQExternal builds an MPQ using external mpqbuilder tool
-func (b *Builder) buildMPQExternal(sourceDir string, files []string, mpqPrefix, outputPath string) error {
-	mpqbuilder, err := b.findMPQBuilder()
-	if err != nil {
-		return err
-	}
-
-	// Create listfile
-	listfile, err := os.CreateTemp("", "thorium_mpq_*.txt")
-	if err != nil {
-		return fmt.Errorf("create listfile: %w", err)
-	}
-	defer os.Remove(listfile.Name())
-
-	for _, file := range files {
-		srcPath := filepath.Join(sourceDir, file)
-		mpqPath := mpqPrefix + "\\" + file
-		fmt.Fprintf(listfile, "%s\t%s\n", srcPath, mpqPath)
-	}
-	listfile.Close()
-
-	// Run mpqbuilder
-	cmd := exec.Command(mpqbuilder, listfile.Name(), outputPath)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("mpqbuilder: %w\n%s", err, stderr.String())
 	}
 
 	return nil
@@ -268,21 +237,9 @@ func (b *Builder) buildMPQExternal(sourceDir string, files []string, mpqPrefix, 
 func (b *Builder) buildMPQWithPaths(sourceDir string, files []string, outputPath string) error {
 	// Ensure output directory exists
 	os.MkdirAll(filepath.Dir(outputPath), 0755)
-
-	// Try StormLib first (built-in)
-	if stormLibAvailable {
-		return b.buildMPQWithPathsStorm(sourceDir, files, outputPath)
-	}
-
-	// Fall back to external mpqbuilder
-	return b.buildMPQWithPathsExternal(sourceDir, files, outputPath)
-}
-
-// buildMPQWithPathsStorm builds an MPQ using StormLib
-func (b *Builder) buildMPQWithPathsStorm(sourceDir string, files []string, outputPath string) error {
 	os.Remove(outputPath)
 
-	archive, err := CreateWithStorm(outputPath, len(files)+10)
+	archive, err := gompq.Create(outputPath, len(files)+10)
 	if err != nil {
 		return err
 	}
@@ -300,63 +257,6 @@ func (b *Builder) buildMPQWithPathsStorm(sourceDir string, files []string, outpu
 	return nil
 }
 
-// buildMPQWithPathsExternal builds an MPQ using external tool
-func (b *Builder) buildMPQWithPathsExternal(sourceDir string, files []string, outputPath string) error {
-	mpqbuilder, err := b.findMPQBuilder()
-	if err != nil {
-		return err
-	}
-
-	// Create listfile
-	listfile, err := os.CreateTemp("", "thorium_mpq_*.txt")
-	if err != nil {
-		return fmt.Errorf("create listfile: %w", err)
-	}
-	defer os.Remove(listfile.Name())
-
-	for _, file := range files {
-		srcPath := filepath.Join(sourceDir, file)
-		mpqPath := strings.ReplaceAll(file, "/", "\\")
-		fmt.Fprintf(listfile, "%s\t%s\n", srcPath, mpqPath)
-	}
-	listfile.Close()
-
-	// Run mpqbuilder
-	cmd := exec.Command(mpqbuilder, listfile.Name(), outputPath)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("mpqbuilder: %w\n%s", err, stderr.String())
-	}
-
-	return nil
-}
-
-// findMPQBuilder locates the mpqbuilder binary
-func (b *Builder) findMPQBuilder() (string, error) {
-	// Check PATH first
-	if path, err := exec.LookPath("mpqbuilder"); err == nil {
-		return path, nil
-	}
-
-	// Check tools directory
-	execPath, _ := os.Executable()
-	toolsPath := filepath.Join(filepath.Dir(execPath), "tools")
-
-	candidates := []string{
-		filepath.Join(toolsPath, "mpqbuilder", "mpqbuilder"),
-		filepath.Join(toolsPath, "mpqbuilder"),
-	}
-
-	for _, path := range candidates {
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
-		}
-	}
-
-	return "", fmt.Errorf("mpqbuilder not found. Install it or add to PATH")
-}
 
 // findModifiedFiles finds files that differ between source and output directories
 func findModifiedFiles(sourceDir, outDir, ext string) ([]string, error) {
