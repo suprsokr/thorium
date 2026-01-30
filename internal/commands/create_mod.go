@@ -122,10 +122,6 @@ thorium build --mod %s
 
 	fmt.Println()
 	fmt.Printf("✓ Mod '%s' created successfully!\n", modName)
-	fmt.Println()
-	fmt.Println("Next steps:")
-	fmt.Printf("  1. Add SQL migrations to %s/dbc_sql/ and %s/world_sql/\n", modName, modName)
-	fmt.Printf("  2. Run: thorium build --mod %s\n", modName)
 
 	return nil
 }
