@@ -9,58 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  # Build Linux binaries with StormLib (native CGO)
-  build-linux:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            arch: amd64
-            goarch: amd64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-            goarch: arm64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake zlib1g-dev libbz2-dev
-
-      - name: Build StormLib
-        run: |
-          cd stormlib
-          mkdir -p build
-          cd build
-          cmake .. -DBUILD_SHARED_LIBS=OFF
-          make -j$(nproc)
-
-      - name: Build Thorium with StormLib
-        run: |
-          mkdir -p build
-          CGO_ENABLED=1 \
-          CGO_CFLAGS="-I$(pwd)/stormlib/src" \
-          CGO_LDFLAGS="-L$(pwd)/stormlib/build -lstorm -lz -lbz2 -lstdc++" \
-          go build -o build/thorium-linux-${{ matrix.arch }} ./cmd/thorium
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: thorium-linux-${{ matrix.arch }}
-          path: build/thorium-linux-${{ matrix.arch }}
-
-  # Build macOS and Windows (pure Go - no StormLib)
-  # These platforms require external mpqbuilder tool
-  build-other:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,49 +17,33 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
-      - name: Build macOS and Windows
+      - name: Build all platforms
         run: |
           mkdir -p build
+          
+          # Linux
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build/thorium-linux-amd64 ./cmd/thorium
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o build/thorium-linux-arm64 ./cmd/thorium
+          
+          # macOS
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o build/thorium-darwin-amd64 ./cmd/thorium
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o build/thorium-darwin-arm64 ./cmd/thorium
+          
+          # Windows
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o build/thorium-windows-amd64.exe ./cmd/thorium
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: thorium-other
-          path: build/thorium-*
-
-  # Create release with all binaries
-  release:
-    needs: [build-linux, build-other]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release files
-        run: |
-          mkdir -p release
-          cp artifacts/thorium-linux-amd64/thorium-linux-amd64 release/
-          cp artifacts/thorium-linux-arm64/thorium-linux-arm64 release/
-          cp artifacts/thorium-other/thorium-darwin-amd64 release/
-          cp artifacts/thorium-other/thorium-darwin-arm64 release/
-          cp artifacts/thorium-other/thorium-windows-amd64.exe release/
-          chmod +x release/thorium-*
+          
+          chmod +x build/thorium-*
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: release/*
+          files: build/*
           generate_release_notes: true
           body: |
-            ## Platform Notes
+            ## Installation
             
-            **Linux (amd64, arm64)**: Full-featured build with built-in MPQ support via StormLib.
+            Download the binary for your platform and add it to your PATH.
             
-            **macOS / Windows**: Pure Go build. Requires external `mpqbuilder` tool for MPQ operations.
+            All builds include full MPQ v1/v2 support via [go-mpq](https://github.com/suprsokr/go-mpq) - no external dependencies required.
