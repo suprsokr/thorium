@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+/thorium
+*.exe
+dist/
+
+# Tool binaries
+tools/dbctool/dbctool
+tools/mpqbuilder/build/
+
+# Stormlib build artifacts
+stormlib/build/
+
+# Go
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
