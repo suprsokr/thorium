@@ -69,28 +69,38 @@ Export DBC files from the database without running the full build.
 thorium export                   # Export all modified DBCs
 ```
 
-### `package`
-
-Package files into MPQ archives without running migrations or exports.
-
-```bash
-thorium package                  # Package all (DBC + LuaXML)
-thorium package --client         # Package client MPQs only
-```
-
 ## Extraction & Import
 
 ### `extract`
 
-Extract files from the WoW client's MPQ archives.
+Extract files from the WoW client's MPQ archives, or copy baseline files to a mod.
 
 ```bash
+# Extract from WoW client to shared baseline
 thorium extract                  # Extract both DBC and LuaXML
 thorium extract --dbc            # Extract DBC files only
 thorium extract --luaxml         # Extract LuaXML files only
+
+# Extract only specific folders (recommended for LuaXML)
+thorium extract --luaxml --filter Interface/FrameXML
+thorium extract --luaxml --filter Interface/AddOns/Blizzard_CombatText
+
+# Copy files from baseline to a mod for editing
+thorium extract --mod my-mod --dest Interface/FrameXML/ChatFrame.lua
+thorium extract --mod my-mod --dest Interface/AddOns/Blizzard_AchievementUI
 ```
 
-Extracted files go to `mods/shared/dbc/` and `mods/shared/luaxml/`.
+**Flags:**
+- `--dbc` - Extract DBC files only
+- `--luaxml` - Extract LuaXML files only
+- `--filter <path>` - Only extract files matching this path prefix (useful for large extractions)
+- `--mod <name>` - Copy files to a mod's `luaxml/` directory instead of extracting
+- `--dest <path>` - Path of file/folder to copy (required with `--mod`)
+
+**Output locations:**
+- `shared/dbc/dbc_source/` - Baseline DBC files
+- `shared/luaxml/luaxml_source/` - Baseline LuaXML files
+- `mods/<mod>/luaxml/` - Mod-specific LuaXML overrides
 
 ### `import`
 

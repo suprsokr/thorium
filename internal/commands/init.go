@@ -46,7 +46,6 @@ func Init(configPath string, args []string) error {
 		{"shared/dbc/dbc_out", "Modified DBC files (exported from database)"},
 		{"shared/luaxml", "LuaXML files"},
 		{"shared/luaxml/luaxml_source", "Original LuaXML files (extracted from client)"},
-		{"shared/luaxml/luaxml_out", "Modified LuaXML files"},
 		{"shared/migrations_applied", "Tracks applied SQL migrations"},
 		{"mods", "Your mods go here"},
 	}
@@ -76,8 +75,6 @@ func Init(configPath string, args []string) error {
 	gitignore := `# Thorium workspace
 shared/dbc/dbc_out/*.dbc
 shared/dbc/dbc_out/*.MPQ
-shared/luaxml/luaxml_out/*
-!shared/luaxml/luaxml_out/.gitkeep
 shared/migrations_applied/*
 !shared/migrations_applied/.gitkeep
 
@@ -139,8 +136,7 @@ A TrinityCore modding workspace.
 │   │   ├── dbc_source/   # Original DBCs (extract with: thorium extract --dbc)
 │   │   └── dbc_out/      # Modified DBCs (exported from database)
 │   ├── luaxml/
-│   │   ├── luaxml_source/  # Original LuaXML (extract with: thorium extract --luaxml)
-│   │   └── luaxml_out/     # Modified LuaXML
+│   │   └── luaxml_source/  # Baseline LuaXML (extract with: thorium extract --luaxml)
 │   └── migrations_applied/ # Tracks applied migrations
 └── mods/
     └── your-mod/

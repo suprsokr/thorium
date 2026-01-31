@@ -1,6 +1,6 @@
 # LuaXML (Interface Files)
 
-LuaXML refers to the Lua scripts and XML layout files that make up World of Warcraft's user interface. Thorium can extract and package these files for UI customization.
+LuaXML refers to the Lua scripts and XML layout files that make up World of Warcraft's user interface. Thorium can extract, modify, and package these files for UI customization.
 
 ## Overview
 
@@ -16,41 +16,84 @@ These files are stored in the client's MPQ archives under the `Interface/` direc
 
 ```
 mods/
-└── shared/
-    └── luaxml/              # Extracted interface files
-        └── Interface/
-            ├── FrameXML/    # Core UI frames
-            ├── GlueXML/     # Login screen UI
-            └── AddOns/      # Built-in addons
+├── shared/
+│   └── luaxml/
+│       └── luaxml_source/           # Baseline files (extracted from client)
+│           └── Interface/
+│               ├── FrameXML/        # Core UI frames
+│               ├── GlueXML/         # Login screen UI
+│               └── AddOns/
+│                   └── CustomPackets/  # Auto-generated (thorium init)
+└── mods/
+    └── my-mod/
+        └── luaxml/                  # Your modifications (only changed files)
+            └── Interface/
+                └── FrameXML/
+                    └── ChatFrame.lua
 ```
 
+## Workflow
+
+### 1. Extract Baseline Files
+
+Extract interface files from the WoW client to use as reference:
+
+```bash
+# Extract all interface files (~16K files, ~500MB)
+thorium extract --luaxml
+
+# Or extract only what you need (recommended)
+thorium extract --luaxml --filter Interface/FrameXML
+thorium extract --luaxml --filter Interface/AddOns/Blizzard_CombatText
+```
+
+### 2. Copy Files to Your Mod
+
+Copy specific files you want to modify into your mod:
+
+```bash
+# Copy a single file
+thorium extract --mod my-mod --dest Interface/FrameXML/ChatFrame.lua
+
+# Copy an entire addon folder
+thorium extract --mod my-mod --dest Interface/AddOns/Blizzard_AchievementUI
+```
+
+### 3. Edit the Files
+
+Edit the copied files in your mod's `luaxml/` directory. Only include files you're actually modifying.
+
+### 4. Build
+
+```bash
+thorium build --mod my-mod
+```
+
+Thorium compares your mod's files against the baseline and packages only the differences into `patch-enUS-T.MPQ`.
+
 ## Use Cases
+
+### Modifying Chat Behavior
+
+```bash
+thorium extract --mod my-mod --dest Interface/FrameXML/ChatFrame.lua
+# Edit mods/my-mod/luaxml/Interface/FrameXML/ChatFrame.lua
+```
 
 ### Custom Login Screen
 
 With the `allow-custom-gluexml` client patch applied, you can modify login screen files:
 
+```bash
+thorium extract --mod my-mod --dest Interface/GlueXML/AccountLogin.lua
 ```
-mods/shared/luaxml/Interface/GlueXML/
-├── AccountLogin.lua
-├── AccountLogin.xml
-└── GlueLocalization.lua
-```
-
-### UI Modifications
-
-Modify the default UI by editing FrameXML files. Common targets:
-
-- `CharacterFrame.xml` - Character panel layout
-- `SpellBookFrame.xml` - Spellbook UI
-- `QuestFrame.xml` - Quest log and tracking
 
 ### Custom Fonts and Textures
 
-Add or replace interface assets:
+Add or replace interface assets in your mod:
 
 ```
-mods/shared/luaxml/Interface/
+mods/my-mod/luaxml/Interface/
 ├── Fonts/
 │   └── MyCustomFont.ttf
 └── Icons/
@@ -59,15 +102,13 @@ mods/shared/luaxml/Interface/
 
 ## Building
 
-When you run `thorium build`, LuaXML files are packaged into a locale-specific MPQ. The output file follows the pattern `patch-<locale>-T.MPQ` (e.g., `patch-enUS-T.MPQ`).
-
-This file is installed to the client's locale directory:
+When you run `thorium build`, LuaXML files are packaged into a locale-specific MPQ:
 
 ```
 WoW 3.3.5a/
 └── Data/
     └── enUS/
-        └── patch-enUS-T.MPQ    ← LuaXML patch goes here
+        └── patch-enUS-T.MPQ    ← Your LuaXML changes
 ```
 
 The client's patch load order ensures your customizations override the defaults.
@@ -117,11 +158,11 @@ OnCustomPacket(1002, function(reader)
 end)
 ```
 
-See [custom-packets.md](custom-packets.md) for more details on CustomPackets.
+See [custom-packets.md](custom-packets.md) for more details.
 
 ## Notes
 
+- **Only include modified files** in your mod's `luaxml/` folder
 - GlueXML modifications require the `allow-custom-gluexml` client patch
-- FrameXML changes are applied via MPQ patch priority
 - Test UI changes carefully - errors can prevent the client from loading
-- Addons in mod `luaxml/Interface/AddOns/` folders are packaged automatically
+- Hidden files (starting with `.`) are automatically excluded from packaging

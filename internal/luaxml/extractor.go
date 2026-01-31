@@ -51,6 +51,19 @@ func (e *Extractor) Extract() (int, error) {
 		return 0, fmt.Errorf("no MPQ files found in %s", clientLocale)
 	}
 
+	// Determine extraction pattern
+	pattern := "Interface\\*"
+	if e.cfg.ExtractFilter != "" {
+		// Convert forward slashes to backslashes for MPQ paths
+		filter := strings.ReplaceAll(e.cfg.ExtractFilter, "/", "\\")
+		// Add wildcard suffix to match files within the path
+		if !strings.HasSuffix(filter, "*") {
+			filter += "\\*"
+		}
+		pattern = filter
+		fmt.Printf("  Filter: %s\n", e.cfg.ExtractFilter)
+	}
+
 	count := 0
 
 	// Extract Interface files from each MPQ
@@ -63,8 +76,8 @@ func (e *Extractor) Extract() (int, error) {
 			continue
 		}
 
-		// Extract Interface folder
-		files, err := archive.Extract("Interface\\*", outputDir)
+		// Extract with pattern
+		files, err := archive.Extract(pattern, outputDir)
 		if err != nil {
 			fmt.Printf("    Warning: %v\n", err)
 			continue

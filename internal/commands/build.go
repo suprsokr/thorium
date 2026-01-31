@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"thorium-cli/internal/config"
 	"thorium-cli/internal/dbc"
@@ -212,7 +213,9 @@ func findModifiedLuaXMLInMod(cfg *config.Config, mod string) ([]modifiedLuaXMLFi
 		if info.IsDir() {
 			return nil
 		}
-		if info.Name() == ".gitkeep" {
+		// Skip hidden files and common junk files
+		name := info.Name()
+		if strings.HasPrefix(name, ".") || name == "Thumbs.db" {
 			return nil
 		}
 

@@ -17,6 +17,9 @@ type Config struct {
 	WorkspaceRoot string // Directory containing config.json
 	ConfigPath    string // Path to this config file
 
+	// Runtime options (not persisted)
+	ExtractFilter string `json:"-"` // Filter for extract command
+
 	// WoW Client
 	WoTLK WoTLKConfig `json:"wotlk"`
 
@@ -228,11 +231,6 @@ func (c *Config) GetDBCMetaPath() string {
 // GetLuaXMLSourcePath returns the path to source LuaXML files
 func (c *Config) GetLuaXMLSourcePath() string {
 	return filepath.Join(c.WorkspaceRoot, "shared", "luaxml", "luaxml_source")
-}
-
-// GetLuaXMLOutPath returns the path to modified LuaXML files
-func (c *Config) GetLuaXMLOutPath() string {
-	return filepath.Join(c.WorkspaceRoot, "shared", "luaxml", "luaxml_out")
 }
 
 // GetModsPath returns the path to mods directory

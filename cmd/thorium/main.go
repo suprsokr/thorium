@@ -12,7 +12,7 @@ import (
 	"thorium-cli/internal/config"
 )
 
-const version = "1.3.0"
+const version = "1.4.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -91,8 +91,6 @@ func main() {
 		cmdErr = commands.Rollback(cfg, subArgs)
 	case "export":
 		cmdErr = commands.Export(cfg, subArgs)
-	case "package":
-		cmdErr = commands.Package(cfg, subArgs)
 	case "status":
 		cmdErr = commands.Status(cfg, subArgs)
 	case "create-mod":
@@ -143,7 +141,6 @@ Commands:
   export             Export modified DBCs from database
   extract            Extract DBC/LuaXML from client MPQs
   import             Import DBC files into database
-  package            Package files into MPQ archives
   dist               Create distributable zip with client MPQs and server SQL
   patch              Apply patches to WoW client executable
   status             Show status of migrations and mods
@@ -166,7 +163,6 @@ Examples:
   thorium import dbc                    # Import DBCs to database
   thorium import dbc --source /path     # Import from custom path
   thorium import dbc --database mydb    # Import to specific database
-  thorium package --client              # Package client MPQs only
   thorium dist                          # Create distributable zip of all mods
   thorium dist --mod my-mod             # Create zip for specific mod
   thorium status                        # Show migration status

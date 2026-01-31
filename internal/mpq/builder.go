@@ -146,32 +146,6 @@ func (b *Builder) PackageLuaXMLFromMods(files []ModifiedLuaXMLFile) (int, error)
 }
 
 
-// PackageLuaXML packages LuaXML files into an MPQ (legacy - uses luaxml_out vs luaxml_source)
-func (b *Builder) PackageLuaXML() (int, error) {
-	luaxmlSource := b.cfg.GetLuaXMLSourcePath()
-	luaxmlOut := b.cfg.GetLuaXMLOutPath()
-
-	// Find modified files
-	modified, err := findModifiedFilesRecursive(luaxmlSource, luaxmlOut)
-	if err != nil {
-		return 0, err
-	}
-
-	if len(modified) == 0 {
-		return 0, nil
-	}
-
-	// Build MPQ
-	mpqName := b.cfg.GetMPQName(b.cfg.Output.LuaXMLMPQ)
-	outputPath := filepath.Join(b.cfg.GetClientLocalePath(), mpqName)
-
-	if err := b.buildMPQWithPaths(luaxmlOut, modified, outputPath); err != nil {
-		return 0, err
-	}
-
-	return len(modified), nil
-}
-
 // CopyToServer copies modified DBCs to the server
 func (b *Builder) CopyToServer() (int, error) {
 	if b.cfg.Server.DBCPath == "" {
