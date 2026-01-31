@@ -15,57 +15,64 @@ import (
     "strings"
 )
 
-// ExportDBCs iterates over all meta files and exports each table
-func ExportDBCs(db *sql.DB, cfg *Config) error {
-    metas, err := filepath.Glob(filepath.Join(cfg.Paths.Meta, "*.meta.json"))
+// ExportDBCs iterates over all embedded meta files and exports modified tables
+// Returns the list of table names that were actually exported
+func ExportDBCs(db *sql.DB, cfg *Config) ([]string, error) {
+    metaFiles, err := GetEmbeddedMetaFiles()
     if err != nil {
-        return fmt.Errorf("failed to scan meta directory: %w", err)
+        return nil, fmt.Errorf("failed to get embedded meta files: %w", err)
     }
 
-    for _, metaPath := range metas {
-        if err := ExportDBC(db, cfg, metaPath); err != nil {
-            return fmt.Errorf("failed to export %s: %w", metaPath, err)
+    var exported []string
+    for _, metaFile := range metaFiles {
+        tableName, err := ExportDBCFromEmbedded(db, cfg, metaFile)
+        if err != nil {
+            return nil, fmt.Errorf("failed to export %s: %w", metaFile, err)
+        }
+        if tableName != "" {
+            exported = append(exported, tableName)
         }
     }
 
-    return nil
+    return exported, nil
 }
 
-// ExportDBC handles exporting a single table/meta to a DBC file
-func ExportDBC(db *sql.DB, cfg *Config, metaPath string) error {
-    meta, err := LoadMeta(metaPath)
+// ExportDBCFromEmbedded handles exporting a single table using embedded meta
+// Returns the table name if exported, empty string if skipped
+func ExportDBCFromEmbedded(db *sql.DB, cfg *Config, metaFile string) (string, error) {
+    meta, err := LoadEmbeddedMeta(metaFile)
     if err != nil {
-        return fmt.Errorf("failed to load meta %s: %w", metaPath, err)
+        return "", fmt.Errorf("failed to load meta %s: %w", metaFile, err)
     }
     
-    tableName := strings.TrimSuffix(meta.File, ".dbc")
+    tableName := strings.ToLower(strings.TrimSuffix(meta.File, ".dbc"))
     if meta.TableName != "" {
-        tableName = meta.TableName
+        tableName = strings.ToLower(meta.TableName)
     }
     
     // Ensure checksum table & entry exist
     if err := ensureChecksumTable(db); err != nil {
-        return fmt.Errorf("failed to ensure dbc_checksum table: %w", err)
+        return "", fmt.Errorf("failed to ensure dbc_checksum table: %w", err)
     }
     
     if err := ensureChecksumEntry(db, tableName); err != nil {
-        return fmt.Errorf("failed to ensure checksum entry for %s: %w", tableName, err)
+        return "", fmt.Errorf("failed to ensure checksum entry for %s: %w", tableName, err)
     }
 
     // Compare checksums
     currentCS, err := getTableChecksum(db, tableName)
     if err != nil {
-        return fmt.Errorf("failed to calculate checksum for %s: %w", tableName, err)
+        return "", fmt.Errorf("failed to calculate checksum for %s: %w", tableName, err)
     }
 
     storedCS, err := getStoredChecksum(db, tableName)
     if err != nil {
-        return fmt.Errorf("failed to get stored checksum for %s: %w", tableName, err)
+        return "", fmt.Errorf("failed to get stored checksum for %s: %w", tableName, err)
     }
 
     if (currentCS == storedCS) && cfg.Options.UseVersioning {
         log.Printf("Skipping %s: no changes detected", tableName)
-        return nil
+        return "", nil  // Not exported, no error
     }
     
     log.Printf("Exporting table %s to DBC...\n", tableName)
@@ -74,13 +81,13 @@ func ExportDBC(db *sql.DB, cfg *Config, metaPath string) error {
     
     rows, err := db.Query(fmt.Sprintf("SELECT * FROM `%s`%s", tableName, orderClause))
     if err != nil {
-        return fmt.Errorf("failed to query table %s: %w", tableName, err)
+        return "", fmt.Errorf("failed to query table %s: %w", tableName, err)
     }
     defer rows.Close()
 
     cols, err := rows.Columns()
     if err != nil {
-        return fmt.Errorf("failed to get columns for table %s: %w", tableName, err)
+        return "", fmt.Errorf("failed to get columns for table %s: %w", tableName, err)
     }
 
     dbc := DBCFile{
@@ -97,7 +104,7 @@ func ExportDBC(db *sql.DB, cfg *Config, metaPath string) error {
             ptrs[i] = &raw[i]
         }
         if err := rows.Scan(ptrs...); err != nil {
-            return fmt.Errorf("failed to scan row for table %s: %w", tableName, err)
+            return "", fmt.Errorf("failed to scan row for table %s: %w", tableName, err)
         }
 
         rec := make(Record)
@@ -141,25 +148,25 @@ func ExportDBC(db *sql.DB, cfg *Config, metaPath string) error {
     }
 
     dbc.Header.RecordCount = uint32(len(dbc.Records))
-    dbc.Header.FieldCount = calculateFieldCount(meta)
-    dbc.Header.RecordSize = calculateRecordSize(meta)
+    dbc.Header.FieldCount = calculateFieldCount(*meta)
+    dbc.Header.RecordSize = calculateRecordSize(*meta)
     dbc.Header.StringBlockSize = uint32(len(dbc.StringBlock))
 
     outPath := filepath.Join(cfg.Paths.Export, meta.File)
     if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
-        return fmt.Errorf("failed to create export directory: %w", err)
+        return "", fmt.Errorf("failed to create export directory: %w", err)
     }
 
-    if err := WriteDBC(&dbc, &meta, outPath); err != nil {
-        return fmt.Errorf("failed to write DBC %s: %w", outPath, err)
+    if err := WriteDBC(&dbc, meta, outPath); err != nil {
+        return "", fmt.Errorf("failed to write DBC %s: %w", outPath, err)
     }
     
     if err := updateChecksum(db, tableName, currentCS); err != nil {
-        return fmt.Errorf("failed to update checksum for %s: %w", tableName, err)
+        return "", fmt.Errorf("failed to update checksum for %s: %w", tableName, err)
     }
 
     log.Printf("Exported %s\n", meta.File)
-    return nil
+    return tableName, nil  // Successfully exported
 }
 
 // --- Helpers ---

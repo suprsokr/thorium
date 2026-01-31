@@ -38,9 +38,9 @@ const (
 
 // CustomPacketHeader represents the header of a custom packet chunk
 type CustomPacketHeader struct {
-	FragmentID  ChunkCount // Current fragment ID
-	TotalFrags  ChunkCount // Total number of fragments
-	Opcode      Opcode     // Custom packet opcode
+	FragmentID ChunkCount // Current fragment ID
+	TotalFrags ChunkCount // Total number of fragments
+	Opcode     Opcode     // Custom packet opcode
 }
 
 // HeaderSize returns the size of the header in bytes

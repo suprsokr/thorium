@@ -4,13 +4,6 @@ build/
 *.exe
 dist/
 
-# Tool binaries
-tools/dbctool/dbctool
-tools/mpqbuilder/build/
-
-# Stormlib build artifacts
-stormlib/build/
-
 # Go
 *.test
 *.out

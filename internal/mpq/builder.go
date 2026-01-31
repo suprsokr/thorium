@@ -128,7 +128,8 @@ func (b *Builder) PackageLuaXMLFromMods(files []ModifiedLuaXMLFile) (int, error)
 	os.MkdirAll(filepath.Dir(outputPath), 0755)
 	os.Remove(outputPath)
 
-	archive, err := gompq.Create(outputPath, len(files)+10)
+	// Use V2 format for WotLK (3.x) and later compatibility
+	archive, err := gompq.CreateV2(outputPath, len(files)+10)
 	if err != nil {
 		return 0, err
 	}
@@ -215,7 +216,8 @@ func (b *Builder) buildMPQ(sourceDir string, files []string, mpqPrefix, outputPa
 	os.MkdirAll(filepath.Dir(outputPath), 0755)
 	os.Remove(outputPath)
 
-	archive, err := gompq.Create(outputPath, len(files)+10)
+	// Use V2 format for WotLK (3.x) and later compatibility
+	archive, err := gompq.CreateV2(outputPath, len(files)+10)
 	if err != nil {
 		return err
 	}
@@ -239,7 +241,8 @@ func (b *Builder) buildMPQWithPaths(sourceDir string, files []string, outputPath
 	os.MkdirAll(filepath.Dir(outputPath), 0755)
 	os.Remove(outputPath)
 
-	archive, err := gompq.Create(outputPath, len(files)+10)
+	// Use V2 format for WotLK (3.x) and later compatibility
+	archive, err := gompq.CreateV2(outputPath, len(files)+10)
 	if err != nil {
 		return err
 	}

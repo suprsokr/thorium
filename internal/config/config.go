@@ -34,7 +34,6 @@ type Config struct {
 
 	// Output settings
 	Output OutputConfig `json:"output"`
-
 }
 
 // WoTLKConfig holds WoW client settings
@@ -84,7 +83,6 @@ type OutputConfig struct {
 	DBCMPQ    string `json:"dbc_mpq"`
 	LuaXMLMPQ string `json:"luaxml_mpq"`
 }
-
 
 // Load loads and parses the config file, expanding environment variables
 func Load(path string) (*Config, error) {
@@ -158,7 +156,10 @@ func (c *Config) applyDefaults() {
 		c.Databases.DBC.Name = "dbc"
 	}
 	if c.Databases.DBC.User == "" {
-		c.Databases.DBC.User = "root"
+		c.Databases.DBC.User = "trinity"
+	}
+	if c.Databases.DBC.Password == "" {
+		c.Databases.DBC.Password = "trinity"
 	}
 
 	if c.Databases.World.Host == "" {
@@ -268,8 +269,8 @@ func DefaultConfig() *Config {
 		},
 		Databases: DatabasesConfig{
 			DBC: DBConfig{
-				User:     "root",
-				Password: "",
+				User:     "trinity",
+				Password: "trinity",
 				Host:     "${MYSQL_HOST:-127.0.0.1}",
 				Port:     "${MYSQL_PORT:-3306}",
 				Name:     "dbc",
@@ -283,7 +284,7 @@ func DefaultConfig() *Config {
 			},
 		},
 		Server: ServerConfig{
-			DBCPath: "${TC_SERVER_PATH}/data/dbc",
+			DBCPath: "${TC_SERVER_PATH}/bin/dbc",
 		},
 		TrinityCore: TrinityConfig{
 			SourcePath:  "${TC_SOURCE_PATH}",

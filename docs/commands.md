@@ -78,7 +78,7 @@ thorium package                  # Package all (DBC + LuaXML)
 thorium package --client         # Package client MPQs only
 ```
 
-## Extraction
+## Extraction & Import
 
 ### `extract`
 
@@ -91,6 +91,24 @@ thorium extract --luaxml         # Extract LuaXML files only
 ```
 
 Extracted files go to `mods/shared/dbc/` and `mods/shared/luaxml/`.
+
+### `import`
+
+Import data files into the MySQL database. Currently supports DBC files.
+
+```bash
+thorium import dbc                           # Import from default path
+thorium import dbc --source /path/to/dbc     # Import from custom path
+thorium import dbc --database custom_dbc     # Import to specific database
+thorium import dbc --skip-existing           # Skip tables that already exist
+```
+
+The import command:
+1. Loads each DBC file and creates a corresponding MySQL table
+2. Copies source DBCs to `mods/shared/dbc/dbc_source/` as baseline for comparison
+3. Stores checksums to track which tables have been modified
+
+This is typically run once during initial setup. See [dbc.md](dbc.md) for the full DBC workflow.
 
 ## Distribution
 

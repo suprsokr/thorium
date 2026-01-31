@@ -9,16 +9,16 @@ import "fmt"
 type Result uint32
 
 const (
-	NoHeader          Result = 0x1   // 1
-	HeaderMismatch    Result = 0x2   // 2
-	InvalidFragCount  Result = 0x4   // 4
-	InvalidFirstFrag  Result = 0x8   // 8
-	InvalidFragID     Result = 0x10  // 16
-	TooSmallFragment  Result = 0x20  // 32
-	TooBigFragment    Result = 0x40  // 64
-	OutOfSpace        Result = 0x80  // 128
-	HandledFragment   Result = 0x100 // 256
-	HandledMessage    Result = 0x200 // 512
+	NoHeader         Result = 0x1   // 1
+	HeaderMismatch   Result = 0x2   // 2
+	InvalidFragCount Result = 0x4   // 4
+	InvalidFirstFrag Result = 0x8   // 8
+	InvalidFragID    Result = 0x10  // 16
+	TooSmallFragment Result = 0x20  // 32
+	TooBigFragment   Result = 0x40  // 64
+	OutOfSpace       Result = 0x80  // 128
+	HandledFragment  Result = 0x100 // 256
+	HandledMessage   Result = 0x200 // 512
 )
 
 // IsSuccess returns true if the result is a success
@@ -61,12 +61,12 @@ func (r Result) String() string {
 
 // Buffer handles packet fragment reassembly
 type Buffer struct {
-	quota            TotalSize
-	minFragmentSize  ChunkSize
-	maxFragmentSize  ChunkSize
-	current          *Reader
-	onPacket         func(*Reader)
-	onError          func(Result)
+	quota           TotalSize
+	minFragmentSize ChunkSize
+	maxFragmentSize ChunkSize
+	current         *Reader
+	onPacket        func(*Reader)
+	onError         func(Result)
 }
 
 // NewBuffer creates a new packet buffer

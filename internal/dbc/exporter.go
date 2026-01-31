@@ -44,6 +44,7 @@ func NewExporter(cfg *appconfig.Config) *Exporter {
 }
 
 // Export exports all modified DBC tables to files
+// Returns the list of table names that were actually exported (not all files in dir)
 func (e *Exporter) Export() ([]string, error) {
 	// Ensure directories exist
 	if err := os.MkdirAll(e.dbcCfg.Paths.Export, 0755); err != nil {
@@ -57,18 +58,10 @@ func (e *Exporter) Export() ([]string, error) {
 	}
 	defer db.Close()
 
-	// Export all DBCs
-	if err := ExportDBCs(db, e.dbcCfg); err != nil {
+	// Export all modified DBCs - returns only the tables that were actually exported
+	exported, err := ExportDBCs(db, e.dbcCfg)
+	if err != nil {
 		return nil, fmt.Errorf("export DBCs: %w", err)
-	}
-
-	// List exported files
-	var exported []string
-	entries, _ := os.ReadDir(e.dbcCfg.Paths.Export)
-	for _, entry := range entries {
-		if len(entry.Name()) > 4 && entry.Name()[len(entry.Name())-4:] == ".dbc" {
-			exported = append(exported, entry.Name())
-		}
 	}
 
 	return exported, nil
@@ -117,4 +110,67 @@ func getImportedTables(db *sql.DB) ([]string, error) {
 		}
 	}
 	return tables, nil
+}
+
+// Importer imports DBC files into the database
+type Importer struct {
+	cfg          *appconfig.Config
+	dbcCfg       *Config
+	skipExisting bool
+}
+
+// NewImporter creates a new DBC importer with custom source path
+func NewImporter(cfg *appconfig.Config, sourcePath string, skipExisting bool) *Importer {
+	return NewImporterWithDB(cfg, sourcePath, cfg.Databases.DBC, skipExisting)
+}
+
+// NewImporterWithDB creates a new DBC importer with custom source path and database config
+func NewImporterWithDB(cfg *appconfig.Config, sourcePath string, dbConfig appconfig.DBConfig, skipExisting bool) *Importer {
+	dbcCfg := &Config{
+		DBC: DBConfig{
+			User:     dbConfig.User,
+			Password: dbConfig.Password,
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			Name:     dbConfig.Name,
+		},
+		Paths: PathConfig{
+			Base:     sourcePath,
+			Export:   cfg.GetDBCOutPath(),
+			Meta:     cfg.GetDBCMetaPath(),
+			Baseline: cfg.GetDBCSourcePath(), // Store baseline DBCs here for later comparison
+		},
+		Options: OptionConfig{
+			UseVersioning: true,
+		},
+	}
+
+	return &Importer{
+		cfg:          cfg,
+		dbcCfg:       dbcCfg,
+		skipExisting: skipExisting,
+	}
+}
+
+// Import imports DBC files into the database
+func (i *Importer) Import() ([]string, error) {
+	// Ensure source directory exists
+	if _, err := os.Stat(i.dbcCfg.Paths.Base); os.IsNotExist(err) {
+		return nil, fmt.Errorf("source directory does not exist: %s", i.dbcCfg.Paths.Base)
+	}
+
+	// Connect to database
+	db, err := openDB(i.dbcCfg.DBC)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+	defer db.Close()
+
+	// Import all DBCs
+	if err := ImportDBCs(db, i.skipExisting, i.dbcCfg); err != nil {
+		return nil, fmt.Errorf("import DBCs: %w", err)
+	}
+
+	// List imported tables
+	return getImportedTables(db)
 }

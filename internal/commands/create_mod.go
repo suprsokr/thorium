@@ -79,7 +79,7 @@ func CreateMod(cfg *config.Config, args []string) error {
 	if !*noLuaXML {
 		luaxmlSource := cfg.GetLuaXMLSourcePath()
 		modLuaXML := filepath.Join(modPath, "luaxml")
-		
+
 		if _, err := os.Stat(luaxmlSource); err == nil {
 			count, err := copyLuaXMLSource(luaxmlSource, modLuaXML)
 			if err != nil {
@@ -200,4 +200,3 @@ func validateModName(name string) error {
 
 	return nil
 }
-

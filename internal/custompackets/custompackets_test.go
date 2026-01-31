@@ -9,16 +9,16 @@ import (
 
 func TestChunkHeaderReadWrite(t *testing.T) {
 	chunk := NewChunk(100)
-	
+
 	header := &CustomPacketHeader{
 		FragmentID: 5,
 		TotalFrags: 10,
 		Opcode:     1001,
 	}
-	
+
 	chunk.SetHeader(header)
 	readHeader := chunk.Header()
-	
+
 	if readHeader.FragmentID != 5 {
 		t.Errorf("FragmentID: expected 5, got %d", readHeader.FragmentID)
 	}
@@ -32,31 +32,31 @@ func TestChunkHeaderReadWrite(t *testing.T) {
 
 func TestWriterBasic(t *testing.T) {
 	writer := NewWriter(1001, 100)
-	
+
 	if err := writer.WriteUInt32(12345); err != nil {
 		t.Fatalf("WriteUInt32 failed: %v", err)
 	}
-	
+
 	if err := writer.WriteString("test"); err != nil {
 		t.Fatalf("WriteString failed: %v", err)
 	}
-	
+
 	if err := writer.WriteFloat(3.14); err != nil {
 		t.Fatalf("WriteFloat failed: %v", err)
 	}
-	
+
 	chunks := writer.GetChunks()
 	if len(chunks) == 0 {
 		t.Fatal("No chunks generated")
 	}
-	
+
 	firstChunk := chunks[0]
 	header := firstChunk.Header()
-	
+
 	if header.Opcode != 1001 {
 		t.Errorf("Opcode: expected 1001, got %d", header.Opcode)
 	}
-	
+
 	t.Logf("Generated %d chunk(s), total size: %d", len(chunks), writer.Size())
 }
 
@@ -66,22 +66,22 @@ func TestReaderBasic(t *testing.T) {
 	writer.WriteUInt32(12345)
 	writer.WriteString("test")
 	writer.WriteFloat(3.14)
-	
+
 	chunks := writer.GetChunks()
-	
+
 	// Create a reader from the chunks
 	reader := NewReader(1001)
 	for _, chunk := range chunks {
 		reader.Push(chunk)
 	}
 	reader.Reset()
-	
+
 	// Read back the values
 	val1 := reader.ReadUInt32(0)
 	if val1 != 12345 {
 		t.Errorf("ReadUInt32: expected 12345, got %d", val1)
 	}
-	
+
 	str, err := reader.ReadString()
 	if err != nil {
 		t.Fatalf("ReadString failed: %v", err)
@@ -89,12 +89,12 @@ func TestReaderBasic(t *testing.T) {
 	if str != "test" {
 		t.Errorf("ReadString: expected 'test', got '%s'", str)
 	}
-	
+
 	val3 := reader.ReadFloat(0)
 	if val3 < 3.13 || val3 > 3.15 {
 		t.Errorf("ReadFloat: expected ~3.14, got %f", val3)
 	}
-	
+
 	t.Logf("Successfully read: uint32=%d, string='%s', float=%f", val1, str, val3)
 }
 
@@ -102,19 +102,19 @@ func TestFragmentation(t *testing.T) {
 	// Create a large packet that will fragment
 	largeSize := TotalSize(60000) // Will create 2+ fragments
 	writer := NewWriter(2001, largeSize)
-	
+
 	// Fill with data
 	for i := 0; i < 15000; i++ {
 		writer.WriteUInt32(uint32(i))
 	}
-	
+
 	chunks := writer.GetChunks()
 	if len(chunks) < 2 {
 		t.Errorf("Expected multiple chunks, got %d", len(chunks))
 	}
-	
+
 	t.Logf("Large packet fragmented into %d chunks", len(chunks))
-	
+
 	// Verify each chunk has correct headers
 	for i, chunk := range chunks {
 		header := chunk.Header()
@@ -136,18 +136,18 @@ func TestBufferReassembly(t *testing.T) {
 	for i := 0; i < 15000; i++ {
 		writer.WriteUInt32(uint32(i))
 	}
-	
+
 	chunks := writer.GetChunks()
 	t.Logf("Created packet with %d chunks", len(chunks))
-	
+
 	// Create buffer to reassemble
 	buffer := NewBuffer(MinFragmentSize, BufferQuota, MaxFragmentSize)
-	
+
 	receivedComplete := false
 	buffer.SetOnPacket(func(reader *Reader) {
 		receivedComplete = true
 		t.Logf("Received complete packet: opcode=%d, size=%d", reader.Opcode(), reader.Size())
-		
+
 		// Verify we can read the data back
 		for i := 0; i < 10; i++ {
 			val := reader.ReadUInt32(0)
@@ -156,11 +156,11 @@ func TestBufferReassembly(t *testing.T) {
 			}
 		}
 	})
-	
+
 	buffer.SetOnError(func(result Result) {
 		t.Errorf("Buffer error: %s", result.String())
 	})
-	
+
 	// Feed chunks to buffer
 	for _, chunk := range chunks {
 		result := buffer.ReceivePacket(chunk.FullSize(), chunk.Data())
@@ -168,7 +168,7 @@ func TestBufferReassembly(t *testing.T) {
 			t.Fatalf("Failed to receive chunk: %s", result.String())
 		}
 	}
-	
+
 	if !receivedComplete {
 		t.Fatal("Complete packet callback was not called")
 	}
@@ -176,7 +176,7 @@ func TestBufferReassembly(t *testing.T) {
 
 func TestAllDataTypes(t *testing.T) {
 	writer := NewWriter(4001, 100)
-	
+
 	// Write all types
 	writer.WriteUInt8(255)
 	writer.WriteInt8(-128)
@@ -189,16 +189,16 @@ func TestAllDataTypes(t *testing.T) {
 	writer.WriteFloat(3.14159)
 	writer.WriteDouble(2.71828)
 	writer.WriteString("Hello, World!")
-	
+
 	chunks := writer.GetChunks()
-	
+
 	// Read back
 	reader := NewReader(4001)
 	for _, chunk := range chunks {
 		reader.Push(chunk)
 	}
 	reader.Reset()
-	
+
 	if v := reader.ReadUInt8(0); v != 255 {
 		t.Errorf("UInt8: expected 255, got %d", v)
 	}
@@ -220,7 +220,7 @@ func TestAllDataTypes(t *testing.T) {
 	// Skip uint64/int64 as they may have precision issues in Go
 	reader.ReadUInt64(0)
 	reader.ReadInt64(0)
-	
+
 	if v := reader.ReadFloat(0); v < 3.14 || v > 3.15 {
 		t.Errorf("Float: expected ~3.14159, got %f", v)
 	}
@@ -230,7 +230,7 @@ func TestAllDataTypes(t *testing.T) {
 	if v, _ := reader.ReadString(); v != "Hello, World!" {
 		t.Errorf("String: expected 'Hello, World!', got '%s'", v)
 	}
-	
+
 	t.Log("All data types read/write successfully")
 }
 
@@ -342,9 +342,9 @@ func TestMixedStringTypes(t *testing.T) {
 	writer := NewWriter(5004, 200)
 
 	// Mix both string types
-	writer.WriteString("NullTerm")          // null-terminated
+	writer.WriteString("NullTerm")             // null-terminated
 	writer.WriteLengthString("LengthPrefixed") // length-prefixed
-	writer.WriteString("Another")           // null-terminated
+	writer.WriteString("Another")              // null-terminated
 
 	chunks := writer.GetChunks()
 

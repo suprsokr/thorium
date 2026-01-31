@@ -22,9 +22,10 @@ type DBConfig struct {
 
 // PathConfig holds file system paths
 type PathConfig struct {
-    Base   string `json:"base"`   // path to base DBC files
-    Export string `json:"export"` // path to DBC export directory
-    Meta   string `json:"meta"`   // path to meta files
+    Base     string `json:"base"`     // path to source DBC files (import source)
+    Export   string `json:"export"`   // path to DBC export directory
+    Meta     string `json:"meta"`     // path to meta files
+    Baseline string `json:"baseline"` // path to baseline DBC files for comparison
 }
 
 // OptionConfig holds generic import/export options

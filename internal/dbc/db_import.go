@@ -21,20 +21,112 @@ var locLangs = []string{
     "unused_1", "unused_2", "unused_3", "unused_4", "flags",
 }
 
-// ImportDBCs scans the meta directory and imports all DBCs
-func ImportDBCs(db *sql.DB, force bool, cfg *Config) error {
-    metas, err := filepath.Glob(filepath.Join(cfg.Paths.Meta, "*.meta.json"))
+// ImportDBCs imports all DBCs using embedded meta files
+func ImportDBCs(db *sql.DB, skipExisting bool, cfg *Config) error {
+    metaFiles, err := GetEmbeddedMetaFiles()
     if err != nil {
-        return fmt.Errorf("failed to scan meta directory: %w", err)
+        return fmt.Errorf("failed to get embedded meta files: %w", err)
     }
 
-    for _, metaPath := range metas {
-        if err := ImportDBC(db, force, cfg, metaPath); err != nil {
+    for _, metaFile := range metaFiles {
+        if err := ImportDBCFromEmbedded(db, skipExisting, cfg, metaFile); err != nil {
             return err
         }
     }
 
     return nil
+}
+
+// ImportDBCFromEmbedded imports a single DBC using embedded meta
+// Also copies the source DBC to the baseline directory for later comparison
+func ImportDBCFromEmbedded(db *sql.DB, skipExisting bool, cfg *Config, metaFile string) error {
+    if err := ensureChecksumTable(db); err != nil {
+        return fmt.Errorf("failed to ensure dbc_checksum table: %w", err)
+    }
+    
+    meta, err := LoadEmbeddedMeta(metaFile)
+    if err != nil {
+        return fmt.Errorf("failed to load meta %s: %w", metaFile, err)
+    }
+
+    tableName := strings.TrimSuffix(meta.File, ".dbc")
+    if meta.TableName != "" {
+        tableName = meta.TableName
+    }
+    tableName = strings.ToLower(tableName)
+    
+    dbcPath := filepath.Join(cfg.Paths.Base, meta.File)
+
+    if _, err := os.Stat(dbcPath); os.IsNotExist(err) {
+        // Try lowercase
+        dbcPath = filepath.Join(cfg.Paths.Base, strings.ToLower(meta.File))
+        if _, err := os.Stat(dbcPath); os.IsNotExist(err) {
+            log.Printf("Skipping %s: DBC file does not exist", tableName)
+            return nil
+        }
+    }
+    
+    if err := ensureChecksumEntry(db, tableName); err != nil {
+        return fmt.Errorf("failed to ensure checksum entry for %s: %w", tableName, err)
+    }
+    
+    if tableExists(db, !skipExisting, tableName) {
+        log.Printf("Skipping %s: table already exists", tableName)
+        return nil
+    }
+
+    log.Printf("Importing %s into table %s...", dbcPath, tableName)
+
+    dbc, err := LoadDBC(dbcPath, *meta)
+    if err != nil {
+        return fmt.Errorf("failed to load DBC %s: %w", dbcPath, err)
+    }
+
+    checkUniqueKeys(dbc.Records, meta, tableName)
+
+    if err := createTable(db, tableName, meta); err != nil {
+        return fmt.Errorf("failed to create table %s: %w", tableName, err)
+    }
+
+    if err := insertRecords(db, tableName, &dbc, meta); err != nil {
+        return fmt.Errorf("failed to insert records for %s: %w", tableName, err)
+    }
+
+    // After import, store the current checksum as the baseline
+    // Export compares current checksum against this stored value
+    // If they differ (due to migrations), the table gets exported
+    checksum, err := getTableChecksum(db, tableName)
+    if err != nil {
+        log.Printf("Warning: could not get checksum for %s: %v", tableName, err)
+    } else {
+        if err := updateChecksum(db, tableName, checksum); err != nil {
+            log.Printf("Warning: could not store baseline checksum for %s: %v", tableName, err)
+        }
+    }
+
+    // Copy source DBC to baseline directory (dbc_source) for later comparison during packaging
+    if cfg.Paths.Baseline != "" {
+        if err := os.MkdirAll(cfg.Paths.Baseline, 0755); err != nil {
+            log.Printf("Warning: could not create baseline dir: %v", err)
+        } else {
+            baselinePath := filepath.Join(cfg.Paths.Baseline, meta.File)
+            if err := copyFileForImport(dbcPath, baselinePath); err != nil {
+                log.Printf("Warning: could not copy to baseline: %v", err)
+            }
+        }
+    }
+
+    log.Printf("Imported %s into table %s", dbcPath, tableName)
+    return nil
+}
+
+// copyFileForImport copies a file from src to dst
+func copyFileForImport(src, dst string) error {
+    data, err := os.ReadFile(src)
+    if err != nil {
+        return err
+    }
+    return os.WriteFile(dst, data, 0644)
 }
 
 // ImportDBC imports a single DBC into SQL based on its meta

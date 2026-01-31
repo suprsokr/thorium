@@ -26,7 +26,13 @@ func Execute(db config.DBConfig, sqlContent string) error {
 
 	for _, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
-		if stmt == "" || strings.HasPrefix(stmt, "--") {
+		if stmt == "" {
+			continue
+		}
+
+		// Remove leading comment lines from the statement
+		stmt = stripLeadingComments(stmt)
+		if stmt == "" {
 			continue
 		}
 
@@ -129,6 +135,23 @@ func splitStatements(content string) []string {
 	}
 
 	return statements
+}
+
+// stripLeadingComments removes leading comment lines from a SQL statement
+func stripLeadingComments(stmt string) string {
+	lines := strings.Split(stmt, "\n")
+	var result []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Skip empty lines and comment-only lines at the start
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			if len(result) == 0 {
+				continue // Skip leading comments
+			}
+		}
+		result = append(result, line)
+	}
+	return strings.TrimSpace(strings.Join(result, "\n"))
 }
 
 // truncate truncates a string to maxLen

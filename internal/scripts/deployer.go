@@ -121,7 +121,7 @@ func extractAddSCFunc(filePath string) (string, error) {
 	}
 
 	content := string(data)
-	
+
 	// Look for pattern: void AddSC_something()
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
