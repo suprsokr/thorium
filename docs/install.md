@@ -25,74 +25,63 @@ Invoke-WebRequest -Uri https://github.com/suprsokr/thorium/releases/latest/downl
 
 ## From Source
 
+Requires Go 1.22 or later.
+
 ```bash
-git clone --recursive https://github.com/suprsokr/thorium.git
+# Install directly
+go install github.com/suprsokr/thorium/cmd/thorium@latest
+
+# Or clone and build
+git clone https://github.com/suprsokr/thorium.git
 cd thorium
-make          # Build with StormLib (recommended)
-make install  # Install to /usr/local/bin
+go build -o thorium ./cmd/thorium
+sudo mv thorium /usr/local/bin/
 ```
 
-This builds a single `thorium` binary (~10MB) with built-in MPQ support via StormLib.
+### Cross-Compile
 
-### Pure Go Build (No CGO)
-
-For cross-compilation or environments without C toolchain:
+Build for other platforms:
 
 ```bash
-make build-pure    # Single platform
-make build-all     # All platforms (linux/darwin/windows, amd64/arm64)
-```
+# Linux
+GOOS=linux GOARCH=amd64 go build -o thorium-linux-amd64 ./cmd/thorium
 
-Note: Pure Go builds require an external `mpqbuilder` tool for MPQ operations.
+# macOS
+GOOS=darwin GOARCH=arm64 go build -o thorium-darwin-arm64 ./cmd/thorium
+
+# Windows
+GOOS=windows GOARCH=amd64 go build -o thorium-windows-amd64.exe ./cmd/thorium
+```
 
 ## Requirements
 
-**Note:** Ubuntu 24.04 is officially supported and tested. Other distributions and versions are untested and may require adjustments.
-
 ### Server Prerequisites
 
-- A Trinity Core 3.3.5 server installed and functioning
-- MySQL 8.0 (see [Trinity Core requirements](https://trinitycore.info/en/install/requirements) for full details)
+- A TrinityCore 3.3.5 server installed and functioning
+- MySQL 8.0 (see [TrinityCore requirements](https://trinitycore.info/en/install/requirements))
 
 ### Build Requirements
 
-**Ubuntu 24.04 (Officially Supported):**
+Just Go 1.22 or later. Thorium is pure Go with no C dependencies.
+
 ```bash
-sudo apt update
-sudo apt install golang-go cmake g++ zlib1g-dev libbz2-dev
+# Ubuntu/Debian
+sudo apt install golang-go
+
+# macOS
+brew install go
+
+# Fedora/RHEL
+sudo dnf install golang
+
+# Arch Linux
+sudo pacman -S go
+
+# Windows
+# Download from https://go.dev/dl/
 ```
 
-**macOS:**
-```bash
-brew install go@1.23 cmake
-# Xcode command line tools provide clang, zlib, bzip2
-xcode-select --install
-```
-
-**Other Ubuntu/Debian versions (Untested):**
-```bash
-sudo apt update
-sudo apt install golang-go cmake g++ zlib1g-dev libbz2-dev
-# Requires Go 1.21 or later
-```
-
-**Fedora/RHEL (Untested):**
-```bash
-sudo dnf install golang cmake gcc-c++ zlib-devel bzip2-devel
-# Requires Go 1.21 or later. Verify with: go version
-```
-
-**Arch Linux (Untested):**
-```bash
-sudo pacman -S go cmake gcc zlib bzip2
-# Requires Go 1.21 or later. Verify with: go version
-```
-
-**Windows (with MSYS2) (Untested):**
-```bash
-pacman -S mingw-w64-x86_64-go mingw-w64-x86_64-cmake mingw-w64-x86_64-gcc mingw-w64-x86_64-zlib mingw-w64-x86_64-bzip2
-# Requires Go 1.21 or later. Verify with: go version
-```
+Verify your Go version: `go version`
 
 ## Configuration
 
