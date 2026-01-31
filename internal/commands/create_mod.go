@@ -46,6 +46,7 @@ func CreateMod(cfg *config.Config, args []string) error {
 		modPath,
 		filepath.Join(modPath, "dbc_sql"),
 		filepath.Join(modPath, "world_sql"),
+		filepath.Join(modPath, "scripts"),
 	}
 
 	// Only create luaxml folder if not skipped
@@ -64,6 +65,7 @@ func CreateMod(cfg *config.Config, args []string) error {
 	gitkeepDirs := []string{
 		filepath.Join(modPath, "dbc_sql"),
 		filepath.Join(modPath, "world_sql"),
+		filepath.Join(modPath, "scripts"),
 	}
 	if !*noLuaXML {
 		gitkeepDirs = append(gitkeepDirs, filepath.Join(modPath, "luaxml"))
@@ -97,6 +99,7 @@ A Thorium mod for TrinityCore.
 
 - `+"`dbc_sql/`"+` - DBC database migrations
 - `+"`world_sql/`"+` - World database migrations
+- `+"`scripts/`"+` - TrinityCore ServerScripts
 - `+"`luaxml/`"+` - Client-side Lua/XML modifications
 
 ## Creating Migrations
@@ -107,12 +110,18 @@ YYYYMMDD_HHMMSS_description.sql
 YYYYMMDD_HHMMSS_description.rollback.sql
 `+"```"+`
 
+## Creating Scripts
+
+`+"```"+`bash
+thorium create-script --mod %s --type spell my_spell
+`+"```"+`
+
 ## Building
 
 `+"```"+`bash
 thorium build --mod %s
 `+"```"+`
-`, modName, modName)
+`, modName, modName, modName)
 
 	readmePath := filepath.Join(modPath, "README.md")
 	if err := os.WriteFile(readmePath, []byte(readme), 0644); err != nil {

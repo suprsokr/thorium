@@ -26,6 +26,12 @@ type Config struct {
 	// Server paths
 	Server ServerConfig `json:"server"`
 
+	// TrinityCore source
+	TrinityCore TrinityConfig `json:"trinitycore"`
+
+	// Extensions
+	Extensions ExtensionsConfig `json:"extensions"`
+
 	// Output settings
 	Output OutputConfig `json:"output"`
 
@@ -55,6 +61,22 @@ type DBConfig struct {
 // ServerConfig holds server paths
 type ServerConfig struct {
 	DBCPath string `json:"dbc_path"` // Where to copy DBCs for server
+}
+
+// TrinityConfig holds TrinityCore source paths
+type TrinityConfig struct {
+	SourcePath  string `json:"source_path"`  // Path to TrinityCore source root
+	ScriptsPath string `json:"scripts_path"` // Path to Custom scripts folder
+}
+
+// ExtensionsConfig holds optional extension settings
+type ExtensionsConfig struct {
+	CustomPackets CustomPacketsConfig `json:"custom_packets"`
+}
+
+// CustomPacketsConfig holds custom packets extension settings
+type CustomPacketsConfig struct {
+	Enabled bool `json:"enabled"` // Whether to enable custom packets support
 }
 
 // OutputConfig holds output file settings
@@ -153,6 +175,14 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Databases.World.Password == "" {
 		c.Databases.World.Password = "trinity"
+	}
+
+	// TrinityCore defaults
+	if c.TrinityCore.SourcePath == "" {
+		c.TrinityCore.SourcePath = getEnvOrDefault("TC_SOURCE_PATH", "")
+	}
+	if c.TrinityCore.ScriptsPath == "" && c.TrinityCore.SourcePath != "" {
+		c.TrinityCore.ScriptsPath = filepath.Join(c.TrinityCore.SourcePath, "src", "server", "scripts", "Custom")
 	}
 
 	// Output defaults
@@ -254,6 +284,15 @@ func DefaultConfig() *Config {
 		},
 		Server: ServerConfig{
 			DBCPath: "${TC_SERVER_PATH}/data/dbc",
+		},
+		TrinityCore: TrinityConfig{
+			SourcePath:  "${TC_SOURCE_PATH}",
+			ScriptsPath: "${TC_SOURCE_PATH}/src/server/scripts/Custom",
+		},
+		Extensions: ExtensionsConfig{
+			CustomPackets: CustomPacketsConfig{
+				Enabled: false,
+			},
 		},
 		Output: OutputConfig{
 			DBCMPQ:    "patch-T.MPQ",

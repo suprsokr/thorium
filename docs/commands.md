@@ -1,6 +1,6 @@
 # Commands
 
-Quick reference for all Thorium CLI commands. See other docs for detailed coverage of [DBC](dbc.md), [LuaXML](luaxml.md), [SQL Migrations](sql-migrations.md), [Distribution](distribution.md), and [Client Patcher](client-patcher.md).
+Quick reference for all Thorium CLI commands. See other docs for detailed coverage of [DBC](dbc.md), [LuaXML](luaxml.md), [SQL Migrations](sql-migrations.md), [Distribution](distribution.md), [Client Patcher](client-patcher.md), and [Custom Packets](custom-packets.md).
 
 ## Workspace Setup
 
@@ -25,6 +25,7 @@ Creates:
 mods/mods/my-custom-items/
 ├── dbc_sql/       # DBC database migrations
 ├── world_sql/     # World database migrations
+├── scripts/       # TrinityCore scripts
 └── luaxml/        # Interface file overrides
 ```
 
@@ -135,6 +136,44 @@ Create a new timestamped migration file pair. See [sql-migrations.md](sql-migrat
 thorium create-migration --mod my-mod --db world "add custom npc"
 thorium create-migration --mod my-mod --db dbc "add custom spell"
 ```
+
+### `create-script`
+
+Create a new TrinityCore script in a mod. See [scripts.md](scripts.md) for details.
+
+```bash
+thorium create-script --mod my-mod --type spell fire_blast
+thorium create-script --mod my-mod --type creature custom_vendor
+thorium create-script --mod my-mod --type server my_hooks
+thorium create-script --mod my-mod --type packet my_protocol
+thorium create-script --mod my-mod --type aura regeneration_aura
+```
+
+Available script types:
+- `spell` - SpellScript for spell behavior
+- `aura` - AuraScript for aura/buff effects
+- `creature` - CreatureScript for NPC AI and behavior
+- `server` - ServerScript for server-wide hooks
+- `packet` - ServerScript for custom packet handlers
+
+### `create-addon`
+
+Create a new WoW addon in a mod's luaxml folder.
+
+```bash
+thorium create-addon --mod my-mod MyAddon
+```
+
+Creates:
+```
+mods/my-mod/luaxml/Interface/AddOns/MyAddon/
+├── MyAddon.toc    # Addon metadata
+└── main.lua       # Main addon code with slash commands
+```
+
+The addon is automatically packaged into the LuaXML MPQ when you run `thorium build`.
+
+**Note:** The `CustomPackets` addon is created automatically during `thorium init` and is always available. Your addons can depend on it by adding `## Dependencies: CustomPackets` to their TOC file.
 
 ### `version`
 

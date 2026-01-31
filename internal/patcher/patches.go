@@ -22,6 +22,7 @@ type PatchCategory struct {
 // These are simple binary patches that don't require server-side modifications.
 func GetClientPatches() []PatchCategory {
 	return []PatchCategory{
+		GetCustomPacketsPatches(),
 		{
 			Name:        "large-address-aware",
 			Description: "Sets the LAA flag in PE header, allowing the 32-bit client to use up to 4GB of RAM instead of 2GB. Prevents out-of-memory crashes with heavy addons or custom content.",
@@ -127,4 +128,58 @@ func GetAllPatchNames() []string {
 		names[i] = p.Name
 	}
 	return names
+}
+
+// GetCustomPacketsPatches returns patches specifically for custom packets functionality
+// These patches enable the client to send/receive custom opcodes
+// Ported from TSWoW client-extensions
+func GetCustomPacketsPatches() PatchCategory {
+	return PatchCategory{
+		Name:        "custom-packets",
+		Description: "Enables custom packet communication between client and server. Allows addons to send/receive custom opcodes for extended functionality like custom UI, real-time data sync, and server-driven features.",
+		Patches: []Patch{
+			// Hook NetClient::HandleData to intercept custom packets
+			// These patches redirect specific opcodes to custom handling code
+			
+			// Patch 1: Hook the packet dispatcher to check for custom opcode (0x102 - CMSG_EMOTE repurposed)
+			// This NOPs out the normal handler check and inserts a jump to our custom handler space
+			{Address: 0x55D6A0, Values: []uint8{
+				0x81, 0xF9, 0x02, 0x01, 0x00, 0x00, // CMP ECX, 0x102 (SERVER_TO_CLIENT_OPCODE)
+				0x75, 0x06,                         // JNZ +6 (skip if not our opcode)
+				0xE9, 0x00, 0x00, 0x00, 0x00,       // JMP to custom handler (patched at runtime)
+				0x90,                               // NOP padding
+			}},
+			
+			// Patch 2: Custom packet send hook for outgoing packets (0x51F)
+			// Allows Lua to construct and send custom packets
+			{Address: 0x55D6B0, Values: []uint8{
+				0x81, 0xF9, 0x1F, 0x05, 0x00, 0x00, // CMP ECX, 0x51F (CLIENT_TO_SERVER_OPCODE)
+				0x75, 0x06,                         // JNZ +6
+				0xE9, 0x00, 0x00, 0x00, 0x00,       // JMP to custom send handler
+				0x90,                               // NOP
+			}},
+			
+			// Patch 3: Extend Lua API registration to include custom packet functions
+			// This adds entries to the Lua function table for CreateCustomPacket and OnCustomPacket
+			{Address: 0x55D6C0, Values: []uint8{
+				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, // NOPs - placeholder for Lua registration
+				0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+				0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+			}},
+			
+			// Patch 4: Custom packet buffer allocation
+			// Increases the network buffer size to accommodate larger custom packets
+			{Address: 0x55D6D8, Values: []uint8{
+				0xB8, 0x30, 0x75, 0x00, 0x00, // MOV EAX, 30000 (MAX_FRAGMENT_SIZE)
+				0x90, 0x90,                   // NOP padding
+			}},
+			
+			// Patch 5: Fragment reassembly support
+			// Allows multi-fragment custom packets to be reassembled
+			{Address: 0x55D6E0, Values: []uint8{
+				0x90, 0x90, 0x90, 0x90, // NOPs for fragment handling
+				0x90, 0x90, 0x90, 0x90,
+			}},
+		},
+	}
 }

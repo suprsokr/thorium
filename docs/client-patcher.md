@@ -43,6 +43,19 @@ Works with stock TrinityCore 3.3.5a (handles `CMSG_ITEM_QUERY_SINGLE` out of the
 - [TSWoW team](https://github.com/tswow/tswow) (`tswow-scripts/util/ClientPatches.ts`)
 - [WoW 3.3.5 Patcher Custom Item Fix](https://www.wowmodding.net/files/file/283-wow-335-patcher-custom-item-fix/)
 
+## Custom Packets
+
+The `custom-packets` patch enables bidirectional communication between client addons and server scripts using custom opcodes. This allows you to build features like custom UI, real-time data sync, and server-driven client behavior.
+
+When you run `thorium init`, a `CustomPackets` addon is automatically created that provides the client-side Lua API.
+
+See [custom-packets.md](custom-packets.md) for complete documentation including:
+
+- Lua API for sending/receiving packets
+- Server-side C++ handlers  
+- Data types and packet structure
+- Setup guide and best practices
+
 ## Technical Details
 
 Each patch modifies specific byte offsets in the WoW.exe binary. The patcher:

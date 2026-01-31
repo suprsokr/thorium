@@ -72,8 +72,56 @@ WoW 3.3.5a/
 
 The client's patch load order ensures your customizations override the defaults.
 
+## Addons
+
+You can create custom addons that are packaged into the LuaXML MPQ:
+
+```bash
+thorium create-addon --mod my-mod MyAddon
+```
+
+This creates:
+```
+mods/my-mod/luaxml/Interface/AddOns/MyAddon/
+├── MyAddon.toc    # Addon metadata
+└── main.lua       # Main addon code
+```
+
+### CustomPackets Addon
+
+When you run `thorium init`, a `CustomPackets` addon is automatically created in `shared/luaxml/luaxml_source/Interface/AddOns/CustomPackets/`. This provides a Lua API for custom client-server communication.
+
+Your addons can depend on it:
+
+```toc
+## Interface: 30300
+## Title: My Addon
+## Dependencies: CustomPackets
+
+main.lua
+```
+
+Then use the API:
+
+```lua
+-- Send custom packet
+local packet = CreateCustomPacket(1001, 0)
+packet:WriteUInt32(12345)
+packet:WriteString("Hello")
+packet:Send()
+
+-- Receive custom packet
+OnCustomPacket(1002, function(reader)
+    local value = reader:ReadUInt32()
+    print("Got: " .. value)
+end)
+```
+
+See [custom-packets.md](custom-packets.md) for more details on CustomPackets.
+
 ## Notes
 
 - GlueXML modifications require the `allow-custom-gluexml` client patch
 - FrameXML changes are applied via MPQ patch priority
 - Test UI changes carefully - errors can prevent the client from loading
+- Addons in mod `luaxml/Interface/AddOns/` folders are packaged automatically

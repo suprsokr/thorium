@@ -12,7 +12,7 @@ import (
 	"thorium-cli/internal/config"
 )
 
-const version = "1.0.1"
+const version = "1.1.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -99,6 +99,10 @@ func main() {
 		cmdErr = commands.CreateMod(cfg, subArgs)
 	case "create-migration":
 		cmdErr = commands.CreateMigration(cfg, subArgs)
+	case "create-script":
+		cmdErr = commands.CreateScript(cfg, subArgs)
+	case "create-addon":
+		cmdErr = commands.CreateAddon(cfg, subArgs)
 	case "extract":
 		cmdErr = commands.Extract(cfg, subArgs)
 	case "patch":
@@ -129,7 +133,9 @@ Commands:
   init               Initialize a new Thorium workspace
   create-mod <name>  Create a new mod with standard structure
   create-migration   Create a new SQL migration in a mod
-  build              Full build: apply migrations, export DBCs, package MPQs
+  create-script      Create a new TrinityCore script in a mod
+  create-addon       Create a new WoW addon in a mod's luaxml folder
+  build              Full build: apply migrations, export DBCs, package MPQs, deploy scripts
   apply              Apply SQL migrations for mods
   rollback           Rollback SQL migrations
   export             Export modified DBCs from database
@@ -146,6 +152,9 @@ Examples:
   thorium create-mod my-mod             # Create a new mod
   thorium create-migration --mod my-mod --db world add_custom_npc
   thorium create-migration --mod my-mod --db dbc add_custom_item
+  thorium create-script --mod my-mod --type spell fire_blast
+  thorium create-script --mod my-mod --type creature custom_vendor
+  thorium create-addon --mod my-mod MyAddon   # Create addon in mod
   thorium build                         # Full build all mods
   thorium build --mod custom-weapon     # Build specific mod
   thorium apply --mod custom-weapon     # Apply migrations only
@@ -156,10 +165,16 @@ Examples:
   thorium dist --mod my-mod             # Create zip for specific mod
   thorium status                        # Show migration status
 
+Script Types:
+  spell              SpellScript (for custom spell behavior)
+  creature           CreatureScript (for custom NPC AI/gossip)
+  server             ServerScript (for server-wide hooks)
+  packet             ServerScript for custom packet handling
+
 Environment Variables:
   WOTLK_PATH           Path to WoW 3.3.5 client directory
+  TC_SOURCE_PATH       Path to TrinityCore source directory
   TC_SERVER_PATH       Path to TrinityCore server directory
   MYSQL_HOST           MySQL host (default: 127.0.0.1)
-  MYSQL_PORT           MySQL port (default: 3306)
-`)
+  MYSQL_PORT           MySQL port (default: 3306)`)
 }

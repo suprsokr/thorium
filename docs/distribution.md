@@ -26,12 +26,16 @@ thorium_dist_20250129_143052.zip
 │   ├── patch-T.MPQ             # DBC modifications (goes in Data/)
 │   └── patch-enUS-T.MPQ        # LuaXML/interface modifications (goes in Data/enUS/)
 └── server/
-    └── sql/
+    ├── sql/
+    │   └── my-mod/
+    │       ├── 20250129_120000_add_npc.sql
+    │       ├── 20250129_120000_add_npc.rollback.sql
+    │       ├── 20250129_130000_add_quest.sql
+    │       └── 20250129_130000_add_quest.rollback.sql
+    └── scripts/
         └── my-mod/
-            ├── 20250129_120000_add_npc.sql
-            ├── 20250129_120000_add_npc.rollback.sql
-            ├── 20250129_130000_add_quest.sql
-            └── 20250129_130000_add_quest.rollback.sql
+            ├── spell_fire_blast.cpp
+            └── npc_custom_vendor.cpp
 ```
 
 ## Installation (for recipients)
@@ -52,6 +56,8 @@ WoW 3.3.5a/
 
 ### Server
 
+#### 1. Apply SQL migrations
+
 Run the SQL files against the world database in order:
 
 ```bash
@@ -67,15 +73,37 @@ mysql -u root -p world < server/sql/my-mod/20250129_130000_add_quest.rollback.sq
 mysql -u root -p world < server/sql/my-mod/20250129_120000_add_npc.rollback.sql
 ```
 
+#### 2. Install scripts (if included)
+
+If the mod includes C++ scripts, copy them to your TrinityCore source:
+
+```bash
+# Copy scripts to TrinityCore Custom directory
+cp -r server/scripts/my-mod/* /path/to/TrinityCore/src/server/scripts/Custom/
+
+# Rebuild TrinityCore
+cd /path/to/TrinityCore/build
+make -j$(nproc)
+
+# Restart server
+systemctl restart worldserver  # or your restart method
+```
+
+Scripts are compiled into the server binary, so a rebuild is required.
+
 ## What's Included
 
 | Content | Source | Install Location |
 |---------|--------|------------------|
 | DBC MPQ | Built from DBC database exports | `Data/patch-T.MPQ` |
-| LuaXML MPQ | Built from mod LuaXML files | `Data/<locale>/patch-<locale>-T.MPQ` |
+| LuaXML MPQ | Built from mod LuaXML files + addons | `Data/<locale>/patch-<locale>-T.MPQ` |
 | World SQL | From `mods/<mod>/world_sql/` | Apply to world database |
+| Scripts | From `mods/<mod>/scripts/` | Copy to TrinityCore Custom/, rebuild |
 
-**Note:** DBC SQL migrations are applied to the DBC database and exported to DBC files, which are then packaged into the client MPQ. The SQL files themselves are not distributed since the client needs the compiled DBC format.
+**Notes:**
+- DBC SQL migrations are applied to the DBC database and exported to DBC files, which are then packaged into the client MPQ. The SQL files themselves are not distributed since the client needs the compiled DBC format.
+- Scripts are distributed as C++ source files. Recipients must copy them to their TrinityCore source and rebuild the server.
+- The LuaXML MPQ includes the `CustomPackets` addon (created during `thorium init`) and any addons created with `thorium create-addon`.
 
 ## Workflow
 

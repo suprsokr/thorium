@@ -35,6 +35,7 @@ This creates:
 mods/mods/my-awesome-mod/
 ├── dbc_sql/            # SQL migrations for DBC database
 ├── world_sql/          # SQL migrations for World database
+├── scripts/            # TrinityCore C++ scripts
 └── luaxml/             # Interface file overrides (Lua/XML)
 ```
 
@@ -50,6 +51,8 @@ dbc_sql/
 └── 20250129_120000_add_custom_spell.rollback.sql
 ```
 
+See [sql-migrations.md](sql-migrations.md) for details.
+
 ### `world_sql/`
 
 SQL migrations that modify server-side data (NPC stats, quests, loot tables, item stats, etc.). These are applied directly to the TrinityCore world database.
@@ -60,20 +63,47 @@ world_sql/
 └── 20250129_130000_add_custom_npc.rollback.sql
 ```
 
+See [sql-migrations.md](sql-migrations.md) for details.
+
+### `scripts/`
+
+TrinityCore C++ scripts for custom behavior. Scripts are deployed to the TrinityCore source during `thorium build` and compiled into the server binary.
+
+```
+scripts/
+├── spell_fire_blast.cpp
+├── npc_custom_vendor.cpp
+└── server_my_hooks.cpp
+```
+
+See [scripts.md](scripts.md) for details.
+
 ### `luaxml/`
 
-Interface file overrides. Files here follow the same structure as the WoW `Interface/` directory and override the defaults.
+Interface file overrides and custom addons. Files here follow the same structure as the WoW `Interface/` directory.
 
 ```
 luaxml/
 └── Interface/
-    └── GlueXML/
-        └── AccountLogin.lua    # Custom login screen logic
+    ├── GlueXML/
+    │   └── AccountLogin.lua    # Custom login screen logic
+    └── AddOns/
+        └── MyAddon/            # Custom addon (created with thorium create-addon)
+            ├── MyAddon.toc
+            └── main.lua
 ```
+
+Create addons with:
+
+```bash
+thorium create-addon --mod my-mod MyAddon
+```
+
+See [luaxml.md](luaxml.md) for details.
 
 ## The `shared/` Directory
 
-The `shared/` directory contains resources that are common across all mods. Thorium creates this folder for you. It probably should not be touched.
+The `shared/` directory contains resources that are common across all mods. Thorium creates this folder for you. It generally should not be modified directly (with the exception of the CustomPackets addon if you need to customize it).
 
 ### `shared/dbc/`
 
@@ -87,10 +117,26 @@ After extraction, the DBC files are imported into MySQL tables where your mod mi
 
 ### `shared/luaxml/`
 
-Extracted interface files from the WoW client. Use these as reference when creating overrides in your mod's `luaxml/` folder.
+Contains two things:
+
+1. **Extracted interface files** - From the WoW client, used as reference
+2. **CustomPackets addon** - Created automatically during `thorium init`
+
+```
+shared/luaxml/
+├── luaxml_extracted/     # Reference files from client
+└── luaxml_source/        # Files to be packaged
+    └── Interface/
+        └── AddOns/
+            └── CustomPackets/    # Auto-generated addon
+                ├── CustomPackets.toc
+                └── CustomPackets.lua
+```
+
+The `CustomPackets` addon provides a Lua API for custom client-server communication. Your mod addons can depend on it. See [client-patcher.md](client-patcher.md) for details.
 
 ```bash
-thorium extract --luaxml    # Populates shared/luaxml/
+thorium extract --luaxml    # Populates shared/luaxml/luaxml_extracted/
 ```
 
 ### `shared/migrations_applied/`
@@ -157,7 +203,7 @@ mods/mods/
 ## Example Workflow
 
 ```bash
-# 1. Initialize workspace
+# 1. Initialize workspace (also creates CustomPackets addon)
 thorium init
 
 # 2. Extract client data
@@ -170,13 +216,22 @@ thorium create-mod custom-sword
 thorium create-migration --mod custom-sword --db dbc "add sword display"
 thorium create-migration --mod custom-sword --db world "add sword item"
 
-# 5. Edit the generated SQL files
+# 5. Create a script (optional)
+thorium create-script --mod custom-sword --type spell sword_strike
 
-# 6. Build everything
+# 6. Create an addon (optional)
+thorium create-addon --mod custom-sword SwordUI
+
+# 7. Edit the generated SQL, C++, and Lua files
+
+# 8. Build everything (packages addons into MPQ)
 thorium build
 
-# 7. Test in-game
+# 9. Rebuild TrinityCore (if using scripts)
+cd /path/to/TrinityCore/build && make -j$(nproc)
 
-# 8. Create distribution package
+# 10. Test in-game
+
+# 11. Create distribution package
 thorium dist --mod custom-sword
 ```

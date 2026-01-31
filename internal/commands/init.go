@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"thorium-cli/internal/config"
+	"thorium-cli/internal/custompackets"
 )
 
 // Init initializes a new Thorium workspace
@@ -94,6 +95,34 @@ Thumbs.db
 		}
 		fmt.Printf("  Created: .gitignore\n")
 	}
+
+	// Create CustomPackets addon in shared luaxml
+	customPacketsDir := filepath.Join(workspaceRoot, "shared", "luaxml", "luaxml_source", "Interface", "AddOns", "CustomPackets")
+	if err := os.MkdirAll(customPacketsDir, 0755); err != nil {
+		return fmt.Errorf("create CustomPackets directory: %w", err)
+	}
+
+	// Generate CustomPackets.lua
+	opts := custompackets.DefaultLuaGeneratorOptions()
+	opts.OutputPath = filepath.Join(customPacketsDir, "CustomPackets.lua")
+	if err := custompackets.GenerateLuaAPI(opts); err != nil {
+		return fmt.Errorf("generate CustomPackets.lua: %w", err)
+	}
+
+	// Generate TOC file
+	tocContent := `## Interface: 30300
+## Title: CustomPackets
+## Notes: Custom packet API for client-server communication
+## Author: Thorium
+## Version: 1.0.0
+
+CustomPackets.lua
+`
+	tocPath := filepath.Join(customPacketsDir, "CustomPackets.toc")
+	if err := os.WriteFile(tocPath, []byte(tocContent), 0644); err != nil {
+		return fmt.Errorf("write CustomPackets.toc: %w", err)
+	}
+	fmt.Printf("  Created: shared/luaxml/luaxml_source/Interface/AddOns/CustomPackets/\n")
 
 	// Create README
 	readme := `# Thorium Workspace

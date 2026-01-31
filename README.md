@@ -1,25 +1,41 @@
 # Thorium
 
-A TrinityCore 3.3.5 modding framework.
+A single, unified workflow for creating WoW 3.3.5 server and client-side mods.
 
-Thorium handles extracting, applying, repackaging and distributing DBCs, world database and client interface files. You write SQL for both DBC and world database edits, or edit auto-extracted client interface files. It also optionally applies some binary patches to wow.exe that aide development.
+## Why Thorium?
 
-Thorium does not help you:
-* Do anything with models, textures or maps (unless perhaps they are DBC or luaxml related).
-* Make Trinity Core edits.
-* Reverse engineer the client.
+**Works with stock TrinityCore.** No forked core required. Your mods are portable and easy to share.
 
-Thorium is nice for a more minimalist modding framework that does not require a forked TrinityCore, but is more complete than combining fragmented tools. Additionally, this framework plays well with LLMs by allowing them to do what they are strong at (view/edit SQL, write luaxml code) without getting lost on what they simply don't know (extraction, application, repacking and distribution of those files).
+**SQL-first workflow.** Edit DBCs and world data using SQL you already know. No learning curve for new file formats.
+
+**Handles the boring stuff.** Extraction, packaging, distribution. Focus on your mod, not the pipeline.
+
+**Organized by design.** Each mod is self-contained with its own migrations, scripts, and assets. Enable, disable, or share individual mods without touching others.
+
+**LLM-friendly.** Thorium's SQL and Lua-based files lets AI assistants help you build mods without getting lost in binary formats or complex toolchains.
 
 ## Features
 
-**Edit DBCs via SQL, auto-distribute to client and server.** Modify client data files using familiar SQL syntax. Thorium automatically exports your changes to DBC files and distributes them to both server and client.
+### DBC Editing via SQL
+Modify client data files—items, spells, creatures, maps—using familiar SQL syntax. Thorium imports DBCs into MySQL tables, lets you edit with migrations, then exports and distributes automatically to both client and server.
 
-**Minimalist SQL migration system.** One workflow for all SQL edits, including DBC changes. Apply and rollback with version control built-in.
+### World Database Migrations
+Same migration workflow for TrinityCore's world database. Version-controlled, with apply and rollback for every change.
 
-**Unpack and modify LuaXML files.** Edit only what you need. Thorium finds your changes and packages just those files, automatically distributing them to your client.
+### LuaXML & Custom Addons
+Extract and modify client interface files. Create custom addons that get packaged into MPQs automatically. Your UI changes distribute with a single command.
 
-**Optional, development-friendly binary patches.** See [docs/client-patcher.md](docs/client-patcher.md).
+### Custom Packets
+Build features that need real-time client-server communication. Send custom data between your addons and server scripts with a simple Lua API. See [docs/custom-packets.md](docs/custom-packets.md).
+
+### C++ Script Scaffolding
+Generate TrinityCore script templates for spells, creatures, and packet handlers. Thorium sets up the boilerplate scripts and distributes into your Trinity Core server so you can focus on logic.
+
+### Binary Patches
+Optional client patches for development: custom login screens, extended Lua APIs, custom packet support, and more. See [docs/client-patcher.md](docs/client-patcher.md).
+
+### Distribution Packages
+Bundle your mod for sharing: MPQs, SQL files, and scripts packaged together with install instructions.
 
 ## Install
 

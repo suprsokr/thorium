@@ -11,6 +11,7 @@ import (
 	"thorium-cli/internal/config"
 	"thorium-cli/internal/dbc"
 	"thorium-cli/internal/mpq"
+	"thorium-cli/internal/scripts"
 )
 
 // Build performs a full build: apply migrations, export DBCs, overlay LuaXML, package MPQs
@@ -116,10 +117,22 @@ func Build(cfg *config.Config, args []string) error {
 	}
 	fmt.Println()
 
-	// Step 4: Package and distribute
+	// Step 4: Deploy Scripts to TrinityCore
+	if cfg.TrinityCore.ScriptsPath != "" {
+		fmt.Println("┌──────────────────────────────────────────┐")
+		fmt.Println("│  Step 4: Deploying Scripts               │")
+		fmt.Println("└──────────────────────────────────────────┘")
+
+		if err := scripts.DeployScripts(cfg, mods); err != nil {
+			return fmt.Errorf("deploy scripts: %w", err)
+		}
+		fmt.Println()
+	}
+
+	// Step 5: Package and distribute
 	if !*skipPackage {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 4: Packaging and Distributing      │")
+		fmt.Println("│  Step 5: Packaging and Distributing      │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
 		builder := mpq.NewBuilder(cfg)
