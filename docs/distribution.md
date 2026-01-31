@@ -5,15 +5,29 @@ The `dist` command creates a distributable package containing everything needed 
 ## Usage
 
 ```bash
-# Create a zip of all mods
+# Create a zip of all mods (client MPQs + server SQL)
 thorium dist
 
 # Create a zip for a specific mod
 thorium dist --mod my-mod
 
+# Client-only distribution (just MPQs, no server SQL)
+thorium dist --client-only
+
+# Include patched wow.exe in distribution
+thorium dist --client-only --include-exe
+
 # Specify output path
 thorium dist --output ./releases/my-release.zip
 ```
+
+### Distribution Types
+
+| Flags | Contents | Use Case |
+|-------|----------|----------|
+| (default) | Client MPQs + Server SQL | Server admins deploying full mod |
+| `--client-only` | Client MPQs only | Players connecting to modded server |
+| `--include-exe` | Also include patched wow.exe | Players needing client patches |
 
 ## Output Structure
 

@@ -20,6 +20,8 @@ func Dist(cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("dist", flag.ExitOnError)
 	modName := fs.String("mod", "", "Package specific mod only")
 	outputPath := fs.String("output", "", "Output zip file path (default: dist/<timestamp>.zip)")
+	clientOnly := fs.Bool("client-only", false, "Client-only distribution (MPQs only, no server SQL)")
+	includeExe := fs.Bool("include-exe", false, "Include patched wow.exe (requires prior patching)")
 	fs.Parse(args)
 
 	fmt.Println("=== Creating Distribution Package ===")
@@ -93,25 +95,44 @@ func Dist(cfg *config.Config, args []string) error {
 		filesAdded++
 	}
 
-	// Add world SQL migrations (apply and rollback)
-	fmt.Println("Collecting server SQL...")
-	for _, mod := range mods {
-		sqlFiles, err := collectWorldSQL(cfg, mod)
+	// Add patched wow.exe if requested
+	if *includeExe {
+		exeFiles, err := collectPatchedExe(cfg)
 		if err != nil {
-			return fmt.Errorf("collect SQL for %s: %w", mod, err)
+			return fmt.Errorf("collect patched exe: %w", err)
 		}
-		for _, sf := range sqlFiles {
-			zipDest := filepath.Join("server", "sql", mod, sf.zipPath)
-			if err := addFileToZip(zipWriter, sf.srcPath, zipDest); err != nil {
-				return fmt.Errorf("add %s to zip: %w", sf.srcPath, err)
+		for _, ef := range exeFiles {
+			if err := addFileToZip(zipWriter, ef.srcPath, filepath.Join("client", ef.zipPath)); err != nil {
+				return fmt.Errorf("add %s to zip: %w", ef.srcPath, err)
 			}
-			fmt.Printf("  Added: server/sql/%s/%s\n", mod, sf.zipPath)
+			fmt.Printf("  Added: client/%s\n", ef.zipPath)
 			filesAdded++
 		}
 	}
 
+	// Add world SQL migrations (apply and rollback) unless client-only
+	if !*clientOnly {
+		fmt.Println("Collecting server SQL...")
+		for _, mod := range mods {
+			sqlFiles, err := collectWorldSQL(cfg, mod)
+			if err != nil {
+				return fmt.Errorf("collect SQL for %s: %w", mod, err)
+			}
+			for _, sf := range sqlFiles {
+				zipDest := filepath.Join("server", "sql", mod, sf.zipPath)
+				if err := addFileToZip(zipWriter, sf.srcPath, zipDest); err != nil {
+					return fmt.Errorf("add %s to zip: %w", sf.srcPath, err)
+				}
+				fmt.Printf("  Added: server/sql/%s/%s\n", mod, sf.zipPath)
+				filesAdded++
+			}
+		}
+	} else {
+		fmt.Println("Skipping server SQL (--client-only)")
+	}
+
 	// Add a README
-	readmeContent := generateDistReadme(mods, clientFiles)
+	readmeContent := generateDistReadme(mods, clientFiles, *clientOnly, *includeExe)
 	readmeWriter, err := zipWriter.Create("README.txt")
 	if err != nil {
 		return fmt.Errorf("create README in zip: %w", err)
@@ -171,6 +192,32 @@ func collectClientFiles(cfg *config.Config) ([]distFile, error) {
 				srcPath: luaxmlMPQ,
 				zipPath: filepath.Base(luaxmlMPQ),
 			})
+		}
+	}
+
+	return files, nil
+}
+
+// collectPatchedExe finds the patched wow.exe to distribute
+func collectPatchedExe(cfg *config.Config) ([]distFile, error) {
+	var files []distFile
+
+	// Look for wow.exe in the WoTLK path
+	wowPath := cfg.WoTLK.Path
+	if wowPath == "" {
+		return files, nil
+	}
+
+	// Check for patched exe (we look for wow.exe or Wow.exe)
+	possibleNames := []string{"wow.exe", "Wow.exe", "WoW.exe"}
+	for _, name := range possibleNames {
+		exePath := filepath.Join(wowPath, name)
+		if _, err := os.Stat(exePath); err == nil {
+			files = append(files, distFile{
+				srcPath: exePath,
+				zipPath: name,
+			})
+			break
 		}
 	}
 
@@ -238,11 +285,16 @@ func addFileToZip(zw *zip.Writer, srcPath, zipPath string) error {
 }
 
 // generateDistReadme creates a README for the distribution
-func generateDistReadme(mods []string, clientFiles []distFile) string {
+func generateDistReadme(mods []string, clientFiles []distFile, clientOnly bool, includeExe bool) string {
 	var sb strings.Builder
 
-	sb.WriteString("Thorium Distribution Package\n")
-	sb.WriteString("============================\n\n")
+	if clientOnly {
+		sb.WriteString("Thorium Client Distribution Package\n")
+		sb.WriteString("====================================\n\n")
+	} else {
+		sb.WriteString("Thorium Distribution Package\n")
+		sb.WriteString("============================\n\n")
+	}
 	sb.WriteString(fmt.Sprintf("Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
 	sb.WriteString(fmt.Sprintf("Mods included: %s\n\n", strings.Join(mods, ", ")))
 
@@ -250,21 +302,45 @@ func generateDistReadme(mods []string, clientFiles []distFile) string {
 	sb.WriteString("--------\n\n")
 
 	sb.WriteString("client/\n")
-	sb.WriteString("  MPQ files to copy to your WoW Data/ folder.\n")
+	if includeExe {
+		sb.WriteString("  Game executable and data files for your WoW installation.\n")
+	} else {
+		sb.WriteString("  MPQ files to copy to your WoW Data/ folder.\n")
+	}
 	for _, cf := range clientFiles {
 		sb.WriteString(fmt.Sprintf("  - %s\n", cf.zipPath))
 	}
 
-	sb.WriteString("\nserver/sql/\n")
-	sb.WriteString("  SQL migrations organized by mod.\n")
-	sb.WriteString("  Apply: Run *.sql files (not *.rollback.sql) against your world database.\n")
-	sb.WriteString("  Rollback: Run *.rollback.sql files to undo changes.\n")
+	if !clientOnly {
+		sb.WriteString("\nserver/sql/\n")
+		sb.WriteString("  SQL migrations organized by mod.\n")
+		sb.WriteString("  Apply: Run *.sql files (not *.rollback.sql) against your world database.\n")
+		sb.WriteString("  Rollback: Run *.rollback.sql files to undo changes.\n")
+	}
 
 	sb.WriteString("\nInstallation\n")
 	sb.WriteString("------------\n\n")
-	sb.WriteString("1. Client: Copy all files from client/ to your WoW Data/ folder.\n")
-	sb.WriteString("2. Server: Run the SQL files in server/sql/ against your world database.\n")
-	sb.WriteString("   Order matters - apply in alphabetical/timestamp order.\n")
+
+	if includeExe {
+		sb.WriteString("1. Backup your existing WoW installation.\n")
+		sb.WriteString("2. Copy wow.exe from client/ to your WoW folder (replace existing).\n")
+		sb.WriteString("3. Copy MPQ files from client/ to your WoW Data/ folder.\n")
+		if !clientOnly {
+			sb.WriteString("4. Server: Run the SQL files in server/sql/ against your world database.\n")
+			sb.WriteString("   Order matters - apply in alphabetical/timestamp order.\n")
+		}
+	} else {
+		sb.WriteString("1. Copy all MPQ files from client/ to your WoW Data/ folder.\n")
+		if !clientOnly {
+			sb.WriteString("2. Server: Run the SQL files in server/sql/ against your world database.\n")
+			sb.WriteString("   Order matters - apply in alphabetical/timestamp order.\n")
+		}
+	}
+
+	if clientOnly {
+		sb.WriteString("\nNote: This is a client-only distribution. Connect to a server that has\n")
+		sb.WriteString("the corresponding server-side modifications installed.\n")
+	}
 
 	return sb.String()
 }

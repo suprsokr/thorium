@@ -101,8 +101,16 @@ Create a distributable zip containing client MPQs and server SQL. See [distribut
 ```bash
 thorium dist                     # Package all mods
 thorium dist --mod my-mod        # Package specific mod
+thorium dist --client-only       # Client files only (for players)
+thorium dist --include-exe       # Include patched wow.exe
 thorium dist --output release.zip
 ```
+
+Flags:
+- `--mod <name>` - Package specific mod only
+- `--client-only` - Omit server SQL (for player distribution)
+- `--include-exe` - Include patched wow.exe
+- `--output <path>` - Custom output path
 
 ## Client Patching
 

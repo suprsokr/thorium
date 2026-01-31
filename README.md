@@ -1,18 +1,16 @@
 # Thorium
 
-A single, unified workflow for creating WoW 3.3.5 server and client-side mods.
+A unified workflow for creating WoW 3.3.5 server and client-side mods.
 
 ## Why Thorium?
 
 **Works with stock TrinityCore.** No forked core required. Your mods are portable and easy to share.
 
-**SQL-first workflow.** Edit DBCs and world data using SQL you already know. No learning curve for new file formats.
+**Organized changes into mods.** Each mod is a self-contained collection of dbc edits, world database edits, interface edits and c++ scripts.
 
-**Handles the boring stuff.** Extraction, packaging, distribution. Focus on your mod, not the pipeline.
+**Handles the boring stuff.** Packaging and distribution. A single command to see your mod in action locally or to get it bundled for your end users. Focus on your mod, not the pipeline.
 
-**Organized by design.** Each mod is self-contained with its own migrations, scripts, and assets. Enable, disable, or share individual mods without touching others.
-
-**LLM-friendly.** Thorium's SQL and Lua-based files lets AI assistants help you build mods without getting lost in binary formats or complex toolchains.
+**LLM-friendly.** Thorium's SQL, C++ scripts and Lua-based files lets AI assistants help you build mods without getting lost in binary formats or complex toolchains.
 
 ## Features
 
@@ -34,7 +32,16 @@ Generate TrinityCore script templates for spells, creatures, and packet handlers
 ### Binary Patches
 Optional client patches for development: custom login screens, extended Lua APIs, custom packet support, and more. See [docs/client-patcher.md](docs/client-patcher.md).
 
-### Distribution Packages
+### Binary Patches
+Optional client patches for development: custom login screens, extended Lua APIs, custom packet support, and more. See [docs/client-patcher.md](docs/client-patcher.md).
+
+### Mod Bundling
+Bundle changes into "mods": Collect DBC, database, LuaXML, and server-side scripts into mods that can be built and distributed easily. Each mod is self-contained with its own migrations, scripts, and assets.
+
+### Local Mod Development
+Quickly build and test mods on your local environment. Thorium handles distribution and application of changes in a mod—apply migrations, export DBCs, package MPQs, and sync to your server and client with a single command.
+
+### Distribute Mods
 Bundle your mod for sharing: MPQs, SQL files, and scripts packaged together with install instructions.
 
 ## Install
@@ -46,55 +53,15 @@ See [docs/install.md](docs/install.md) for pre-built binaries or building from s
 Create a new item mod from scratch:
 
 ```bash
-# Initialize workspace
-thorium init
-
-# Configure paths and database connections
-vim config.json
-# Update these required fields:
-#   "wotlk": {
-#     "path": "/path/to/your/wotlk/client"  # or "${WOTLK_PATH}" to use env var
-#   },
-#   "databases": {
-#     "dbc": {
-#       "user": "root",        # DBC database user
-#       "password": "",        # DBC database password
-#       "host": "127.0.0.1",   # DBC database host
-#       "port": "3306",        # DBC database port
-#       "name": "dbc"          # DBC database name
-#     },
-#     "world": {
-#       "user": "trinity",     # World database user
-#       "password": "trinity", # World database password
-#       "host": "127.0.0.1",  # World database host
-#       "port": "3306",       # World database port
-#       "name": "world"        # World database name
-#     }
-#   },
-#   "server": {
-#     "dbc_path": "/path/to/trinitycore/server/data/dbc"  # or "${TC_SERVER_PATH}/data/dbc"
-#   }
-
-# Create a new mod (without LuaXML since we're just adding an item)
-thorium create-mod my-custom-item --no-luaxml
-
-# Create DBC migration for the item definition
-thorium create-migration --mod my-custom-item --db dbc add_legendary_sword
-
-# Edit the DBC migration file (apply)
+thorium init # Initialize workspace
+vim config.json # Configure paths and database connections
+thorium create-mod my-custom-item
+thorium create-migration --mod my-custom-item --db dbc add_legendary_sword # Edit DBCs via SQL
 vim mods/my-custom-item/dbc_sql/*_add_legendary_sword.sql
 # DELETE FROM `Item` WHERE `id` = 90001;
 # INSERT INTO `Item` (`id`, `class`, `subclass`, `sound_override_subclass`, `material`, `display_id`, `inventory_type`, `sheath`) 
 # VALUES (90001, 2, 7, -1, 1, 32254, 17, 1);
-
-# Edit the DBC rollback file
-vim mods/my-custom-item/dbc_sql/*_add_legendary_sword.rollback.sql
-# DELETE FROM `Item` WHERE `id` = 90001;
-
-# Create world database migration for server-side item data
-thorium create-migration --mod my-custom-item --db world add_legendary_sword_stats
-
-# Edit the world migration file (apply)
+thorium create-migration --mod my-custom-item --db world add_legendary_sword_stats # Edit your server to know about your custom item.
 vim mods/my-custom-item/world_sql/*_add_legendary_sword_stats.sql
 # DELETE FROM `item_template` WHERE `entry` = 90001;
 # INSERT INTO `item_template` (
@@ -113,12 +80,37 @@ vim mods/my-custom-item/world_sql/*_add_legendary_sword_stats.sql
 #     -1, 60
 # );
 
-# Edit the world rollback file
+# Easily undo changes you don't want later with rollback files.
+vim mods/my-custom-item/dbc_sql/*_add_legendary_sword.rollback.sql
+# DELETE FROM `Item` WHERE `id` = 90001;
 vim mods/my-custom-item/world_sql/*_add_legendary_sword_stats.rollback.sql
 # DELETE FROM `item_template` WHERE `entry` = 90001;
 
-# Build everything: apply migrations, export DBCs, package MPQs, distribute to server and client.
+# Build everything: apply migrations, package DBCs into MPQs, export DBCs to your WoTLK client.
 thorium build
 ```
 
-Launch your Trinty Core 335 server and client. `.additem 90001` in game from a GM account.
+Test your mod:
+1. Launch your Trinty Core 335 server
+2. Launch your WoTLK client. 
+3. `.additem 90001` in game from a GM account.
+
+## Ready to distribute your mod to players?
+
+Once your mod is tested and ready, create a distributable package:
+
+```bash
+# Build everything (applies migrations, exports DBCs, creates MPQs)
+thorium build
+
+# Create distribution package
+thorium dist --output ./releases/my-mod-v1.0.0.zip
+```
+
+The generated zip contains:
+- **Client MPQs**: Copy to `Data/patch-T.MPQ` and `Data/<locale>/patch-<locale>-T.MPQ`
+- **Server SQL**: Migration files to apply to the world database
+- **Server Scripts**: C++ scripts to copy to TrinityCore and rebuild
+- **README.txt**: Installation instructions for recipients
+
+Share the zip with players and server admins. See [docs/distribution.md](docs/distribution.md) for detailed installation instructions.
