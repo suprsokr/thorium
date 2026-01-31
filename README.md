@@ -32,9 +32,6 @@ Generate TrinityCore script templates for spells, creatures, and packet handlers
 ### Binary Patches
 Optional client patches for development: custom login screens, extended Lua APIs, custom packet support, and more. See [docs/client-patcher.md](docs/client-patcher.md).
 
-### Binary Patches
-Optional client patches for development: custom login screens, extended Lua APIs, custom packet support, and more. See [docs/client-patcher.md](docs/client-patcher.md).
-
 ### Mod Bundling
 Bundle changes into "mods": Collect DBC, database, LuaXML, and server-side scripts into mods that can be built and distributed easily. Each mod is self-contained with its own migrations, scripts, and assets.
 
@@ -95,22 +92,21 @@ Test your mod:
 2. Launch your WoTLK client. 
 3. `.additem 90001` in game from a GM account.
 
-## Ready to distribute your mod to players?
+## Ready to distribute your mod to other users?
 
-Once your mod is tested and ready, create a distributable package:
+Once your mod is tested and ready, create a distributable package for server admins:
 
 ```bash
 # Build everything (applies migrations, exports DBCs, creates MPQs)
 thorium build
 
-# Create distribution package
+# Create distribution package (includes client MPQs + server SQL)
 thorium dist --output ./releases/my-mod-v1.0.0.zip
 ```
 
 The generated zip contains:
 - **Client MPQs**: Copy to `Data/patch-T.MPQ` and `Data/<locale>/patch-<locale>-T.MPQ`
 - **Server SQL**: Migration files to apply to the world database
-- **Server Scripts**: C++ scripts to copy to TrinityCore and rebuild
 - **README.txt**: Installation instructions for recipients
 
-Share the zip with players and server admins. See [docs/distribution.md](docs/distribution.md) for detailed installation instructions.
+Share the zip with server admins. For players, you can `thorium dist --client-only` to skip the server-side edits. See [docs/distribution.md](docs/distribution.md) for detailed installation instructions.
