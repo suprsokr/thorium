@@ -12,7 +12,7 @@ import (
 	"thorium-cli/internal/config"
 )
 
-const version = "1.1.0"
+const version = "1.1.2"
 
 func main() {
 	if len(os.Args) < 2 {
