@@ -47,6 +47,9 @@ func CreateMod(cfg *config.Config, args []string) error {
 		filepath.Join(modPath, "dbc_sql"),
 		filepath.Join(modPath, "world_sql"),
 		filepath.Join(modPath, "scripts"),
+		filepath.Join(modPath, "server-patches"),
+		filepath.Join(modPath, "binary-edits"),
+		filepath.Join(modPath, "assets"),
 	}
 
 	// Only create luaxml folder if not skipped
@@ -66,6 +69,9 @@ func CreateMod(cfg *config.Config, args []string) error {
 		filepath.Join(modPath, "dbc_sql"),
 		filepath.Join(modPath, "world_sql"),
 		filepath.Join(modPath, "scripts"),
+		filepath.Join(modPath, "server-patches"),
+		filepath.Join(modPath, "binary-edits"),
+		filepath.Join(modPath, "assets"),
 	}
 	if !*noLuaXML {
 		gitkeepDirs = append(gitkeepDirs, filepath.Join(modPath, "luaxml"))
@@ -87,7 +93,10 @@ A Thorium mod for TrinityCore.
 
 - `+"`dbc_sql/`"+` - DBC database migrations
 - `+"`world_sql/`"+` - World database migrations
-- `+"`scripts/`"+` - TrinityCore ServerScripts
+- `+"`scripts/`"+` - TrinityCore C++ scripts
+- `+"`server-patches/`"+` - TrinityCore source patches (.patch files)
+- `+"`binary-edits/`"+` - Client binary patches (.json files)
+- `+"`assets/`"+` - Files to copy to client directory
 - `+"`luaxml/`"+` - Client-side Lua/XML modifications
 
 ## Creating Migrations

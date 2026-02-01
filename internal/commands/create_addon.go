@@ -78,9 +78,6 @@ func CreateAddon(cfg *config.Config, args []string) error {
 	fmt.Println("  1. Edit the addon files as needed")
 	fmt.Println("  2. Run 'thorium build' to package into MPQ")
 	fmt.Println("  3. The addon will be available in-game")
-	fmt.Println()
-	fmt.Println("Note: CustomPackets API is available globally via the CustomPackets addon.")
-	fmt.Println("      Use: ## Dependencies: CustomPackets in your TOC if needed.")
 
 	return nil
 }

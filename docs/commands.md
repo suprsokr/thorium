@@ -1,6 +1,6 @@
 # Commands
 
-Quick reference for all Thorium CLI commands. See other docs for detailed coverage of [DBC](dbc.md), [LuaXML](luaxml.md), [SQL Migrations](sql-migrations.md), [Distribution](distribution.md), [Client Patcher](client-patcher.md), and [Custom Packets](custom-packets.md).
+Quick reference for all Thorium CLI commands. See other docs for detailed coverage of [Mods](mods.md), [DBC](dbc.md), [LuaXML](luaxml.md), [SQL Migrations](sql-migrations.md), [Scripts](scripts.md), [Binary Edits](binary-edits.md), [Server Patches](server-patches.md), [Assets](assets.md), [Distribution](distribution.md), and [Custom Packets](custom-packets.md).
 
 ## Workspace Setup
 
@@ -23,22 +23,33 @@ thorium create-mod my-custom-items
 Creates:
 ```
 mods/mods/my-custom-items/
-├── dbc_sql/       # DBC database migrations
-├── world_sql/     # World database migrations
-├── scripts/       # TrinityCore scripts
-└── luaxml/        # Interface file overrides
+├── dbc_sql/         # DBC database migrations
+├── world_sql/       # World database migrations
+├── scripts/         # TrinityCore C++ scripts
+├── server-patches/  # TrinityCore source patches (.patch files)
+├── binary-edits/    # Client binary patches (.json files)
+├── assets/          # Files to copy to client directory
+└── luaxml/          # Interface file overrides (Lua/XML)
 ```
 
 ## Build Pipeline
 
 ### `build`
 
-Full build pipeline: applies pending migrations, exports DBCs, and packages MPQs.
+Full build pipeline: applies migrations, binary edits, server patches, copies assets, exports DBCs, deploys scripts, and packages MPQs.
 
 ```bash
 thorium build                    # Build all mods
 thorium build --mod my-mod       # Build specific mod only
+thorium build --force            # Reapply patches/edits even if tracked as applied
 ```
+
+**Flags:**
+- `--skip-migrations` - Skip SQL migrations
+- `--skip-export` - Skip DBC export
+- `--skip-package` - Skip MPQ packaging
+- `--skip-server` - Skip copying DBCs to server
+- `--force` - Reapply binary-edits and server-patches even if already applied
 
 ### `apply`
 
@@ -140,53 +151,6 @@ Flags:
 - `--include-exe` - Include patched wow.exe
 - `--output <path>` - Custom output path
 
-## Client Patching
-
-### `patch`
-
-Apply binary patches to the WoW client executable. See [client-patcher.md](client-patcher.md) for details.
-
-```bash
-thorium patch                    # Apply all patches (uses wotlk.path from config.json)
-thorium patch /path/to/WoW.exe   # Apply to specific exe (no config.json needed)
-thorium patch --list             # List available patches
-thorium patch --dry-run          # Preview what would be applied
-thorium patch --restore          # Restore from backup
-```
-
-**Note:** When providing a direct path to `WoW.exe`, no `config.json` is required. This is useful for patching clients outside of a Thorium workspace.
-
-## Server Patching
-
-### `patch-server`
-
-Apply source patches to TrinityCore. These patches modify TrinityCore C++ source code to enable features like custom packets that require core support.
-
-```bash
-thorium patch-server --list                  # List available server patches
-thorium patch-server --status                # Show which patches are applied
-thorium patch-server apply custom-packets    # Apply custom-packets support
-thorium patch-server revert custom-packets   # Revert the patch
-thorium patch-server apply custom-packets --dry-run  # Preview without applying
-```
-
-**Available patches:**
-
-| Patch | Description |
-|-------|-------------|
-| `custom-packets` | Adds custom packet support (opcode 0x51F) for addon-server communication |
-
-**Important:** After applying or reverting a server patch, you must rebuild TrinityCore:
-
-```bash
-cd /path/to/TrinityCore/build
-make -j$(nproc)
-```
-
-Patches are tracked in `shared/server_patches_applied.json` in your workspace.
-
-**Configuration:** Set `trinitycore.source_path` in `config.json` or the `TC_SOURCE_PATH` environment variable.
-
 ## Utilities
 
 ### `status`
@@ -242,8 +206,6 @@ mods/my-mod/luaxml/Interface/AddOns/MyAddon/
 ```
 
 The addon is automatically packaged into the LuaXML MPQ when you run `thorium build`.
-
-**Note:** The `CustomPackets` addon is created automatically during `thorium init` and is always available. Your addons can depend on it by adding `## Dependencies: CustomPackets` to their TOC file.
 
 ### `version`
 

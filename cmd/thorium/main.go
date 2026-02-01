@@ -72,37 +72,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Load config for other commands (some commands can work without it)
+	// Load config for other commands
 	cfg, err := config.Load(configPath)
-	configLoadErr := err
-
-	// Commands that can work without config.json (when given direct paths)
-	switch cmd {
-	case "patch":
-		// patch can work without config if a direct exe path is provided
-		if configLoadErr != nil {
-			cfg = nil // Pass nil config, let patch handle it
-		}
-		if err := commands.Patch(cfg, subArgs); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	case "patch-server":
-		// patch-server can work with TC_SOURCE_PATH env var if no config
-		if configLoadErr != nil {
-			cfg = nil
-		}
-		if err := commands.PatchServer(cfg, subArgs); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-
-	// All other commands require config
-	if configLoadErr != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", configLoadErr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Run 'thorium init' to create a workspace.\n")
 		os.Exit(1)
 	}
@@ -160,15 +133,13 @@ Commands:
   create-migration   Create a new SQL migration in a mod
   create-script      Create a new TrinityCore script in a mod
   create-addon       Create a new WoW addon in a mod's luaxml folder
-  build              Full build: apply migrations, export DBCs, package MPQs, deploy scripts
+  build              Full build: migrations, patches, DBCs, scripts, assets, MPQs
   apply              Apply SQL migrations for mods
   rollback           Rollback SQL migrations
   export             Export modified DBCs from database
   extract            Extract DBC/LuaXML from client MPQs
   import             Import DBC files into database
   dist               Create distributable zip with client MPQs and server SQL
-  patch              Apply patches to WoW client executable
-  patch-server       Apply patches to TrinityCore source (e.g., custom-packets)
   status             Show status of migrations and mods
   version            Show version information
   help               Show this help message
@@ -183,6 +154,7 @@ Examples:
   thorium create-addon --mod my-mod MyAddon   # Create addon in mod
   thorium build                         # Full build all mods
   thorium build --mod custom-weapon     # Build specific mod
+  thorium build --force                 # Reapply patches even if already applied
   thorium apply --mod custom-weapon     # Apply migrations only
   thorium export                        # Export DBCs only
   thorium extract --dbc                 # Extract DBCs from client
@@ -191,11 +163,6 @@ Examples:
   thorium import dbc --database mydb    # Import to specific database
   thorium dist                          # Create distributable zip of all mods
   thorium dist --mod my-mod             # Create zip for specific mod
-  thorium patch                         # Patch WoW client (uses config.json)
-  thorium patch /path/to/WoW.exe        # Patch specific exe (no config needed)
-  thorium patch-server --list           # List available server patches
-  thorium patch-server apply custom-packets  # Apply custom packets support to TC
-  thorium patch-server revert custom-packets # Revert the patch
   thorium status                        # Show migration status
 
 Script Types:
@@ -203,6 +170,15 @@ Script Types:
   creature           CreatureScript (for custom NPC AI/gossip)
   server             ServerScript (for server-wide hooks)
   packet             ServerScript for custom packet handling
+
+Mod Structure:
+  mods/<mod>/dbc_sql/         SQL migrations for DBC database
+  mods/<mod>/world_sql/       SQL migrations for World database
+  mods/<mod>/scripts/         TrinityCore C++ scripts
+  mods/<mod>/server-patches/  TrinityCore source patches (.patch files)
+  mods/<mod>/binary-edits/    Client binary patches (.json files)
+  mods/<mod>/assets/          Files to copy to client (with config.json)
+  mods/<mod>/luaxml/          Client-side Lua/XML modifications
 
 Environment Variables:
   WOTLK_PATH           Path to WoW 3.3.5 client directory
