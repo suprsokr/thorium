@@ -28,7 +28,11 @@ func Build(cfg *config.Config, args []string) error {
 	skipExport := fs.Bool("skip-export", false, "Skip DBC export")
 	skipPackage := fs.Bool("skip-package", false, "Skip MPQ packaging")
 	skipServer := fs.Bool("skip-server", false, "Skip copying to server")
-	force := fs.Bool("force", false, "Force reapply binary-edits and server-patches even if already applied")
+	force := fs.Bool("force", false, "Force reapply all tracked items (binary-edits, server-patches, assets, scripts)")
+	forceBinaryEdits := fs.Bool("force-binary-edits", false, "Force reapply binary edits even if already applied")
+	forceServerPatches := fs.Bool("force-server-patches", false, "Force reapply server patches even if already applied")
+	forceAssets := fs.Bool("force-assets", false, "Force recopy assets even if unchanged")
+	forceScripts := fs.Bool("force-scripts", false, "Force redeploy scripts even if unchanged")
 	fs.Parse(args)
 
 	fmt.Println("╔══════════════════════════════════════════╗")
@@ -70,7 +74,18 @@ func Build(cfg *config.Config, args []string) error {
 		fmt.Println("│  Step 1: Applying SQL Migrations         │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
+		migrationsFound := false
 		for _, mod := range mods {
+			// Check if mod has any migration directories with files
+			dbcDir := filepath.Join(cfg.GetModsPath(), mod, "dbc_sql")
+			worldDir := filepath.Join(cfg.GetModsPath(), mod, "world_sql")
+			if entries, _ := os.ReadDir(dbcDir); len(entries) > 0 {
+				migrationsFound = true
+			}
+			if entries, _ := os.ReadDir(worldDir); len(entries) > 0 {
+				migrationsFound = true
+			}
+
 			if err := applyMigrations(cfg, mod, "dbc"); err != nil {
 				return fmt.Errorf("apply dbc migrations for %s: %w", mod, err)
 			}
@@ -78,16 +93,19 @@ func Build(cfg *config.Config, args []string) error {
 				return fmt.Errorf("apply world migrations for %s: %w", mod, err)
 			}
 		}
+		if !migrationsFound {
+			fmt.Println("  No new SQL migrations to apply")
+		}
 		fmt.Println()
 	}
 
-	// Step 1.5: Apply binary edits to client
+	// Step 2: Apply binary edits to client
 	if cfg.WoTLK.Path != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 1.5: Applying Binary Edits         │")
+		fmt.Println("│  Step 2: Applying Binary Edits           │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
-		editsApplied, err := applyModBinaryEdits(cfg, mods, *force)
+		editsApplied, err := applyModBinaryEdits(cfg, mods, *force || *forceBinaryEdits)
 		if err != nil {
 			return fmt.Errorf("apply binary edits: %w", err)
 		}
@@ -99,13 +117,13 @@ func Build(cfg *config.Config, args []string) error {
 		fmt.Println()
 	}
 
-	// Step 1.6: Apply server patches from mods
+	// Step 3: Apply server patches from mods
 	if cfg.TrinityCore.SourcePath != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 1.6: Applying Server Patches       │")
+		fmt.Println("│  Step 3: Applying Server Patches         │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
-		patchesApplied, err := applyModServerPatches(cfg, mods, *force)
+		patchesApplied, err := applyModServerPatches(cfg, mods, *force || *forceServerPatches)
 		if err != nil {
 			return fmt.Errorf("apply server patches: %w", err)
 		}
@@ -118,13 +136,13 @@ func Build(cfg *config.Config, args []string) error {
 		fmt.Println()
 	}
 
-	// Step 1.7: Copy mod assets to client
+	// Step 4: Copy mod assets to client
 	if cfg.WoTLK.Path != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 1.7: Copying Mod Assets            │")
+		fmt.Println("│  Step 4: Copying Mod Assets              │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
-		assetsCopied, err := copyModAssets(cfg, mods, *force)
+		assetsCopied, err := copyModAssets(cfg, mods, *force || *forceAssets)
 		if err != nil {
 			return fmt.Errorf("copy mod assets: %w", err)
 		}
@@ -136,10 +154,10 @@ func Build(cfg *config.Config, args []string) error {
 		fmt.Println()
 	}
 
-	// Step 2: Export modified DBCs
+	// Step 5: Export modified DBCs
 	if !*skipExport {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 2: Exporting Modified DBCs         │")
+		fmt.Println("│  Step 5: Exporting Modified DBCs         │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
 		exporter := dbc.NewExporter(cfg)
@@ -155,9 +173,9 @@ func Build(cfg *config.Config, args []string) error {
 		fmt.Println()
 	}
 
-	// Step 3: Check for LuaXML modifications
+	// Step 6: Check for LuaXML modifications
 	fmt.Println("┌──────────────────────────────────────────┐")
-	fmt.Println("│  Step 3: Checking LuaXML Modifications   │")
+	fmt.Println("│  Step 6: Checking LuaXML Modifications   │")
 	fmt.Println("└──────────────────────────────────────────┘")
 
 	// Collect modified LuaXML files from all mods
@@ -184,23 +202,23 @@ func Build(cfg *config.Config, args []string) error {
 	}
 	fmt.Println()
 
-	// Step 4: Deploy Scripts to TrinityCore
+	// Step 7: Deploy Scripts to TrinityCore
 	if cfg.TrinityCore.ScriptsPath != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 4: Deploying Scripts               │")
+		fmt.Println("│  Step 7: Deploying Scripts               │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
-		if err := scripts.DeployScripts(cfg, mods); err != nil {
+		if _, err := scripts.DeployScripts(cfg, mods, *force || *forceScripts); err != nil {
 			return fmt.Errorf("deploy scripts: %w", err)
 		}
 		fmt.Println()
 	}
 
-	// Step 5: Package and distribute
+	// Step 8: Package and distribute
 	var dbcCount, luaxmlCount int
 	if !*skipPackage {
 		fmt.Println("┌──────────────────────────────────────────┐")
-		fmt.Println("│  Step 5: Packaging and Distributing      │")
+		fmt.Println("│  Step 8: Packaging and Distributing      │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
 		builder := mpq.NewBuilder(cfg)
@@ -502,6 +520,9 @@ func saveServerPatchTracker(workspaceRoot string, tracker serverPatchTracker) er
 // Binary Edits
 // ============================================================================
 
+// Clean WoW 3.3.5a (12340) client MD5
+const CLEAN_CLIENT_MD5 = "45892bdedd0ad70aed4ccd22d9fb5984"
+
 // BinaryEditFile represents a binary edit JSON file
 type binaryEditFile struct {
 	Patches []binaryPatch `json:"patches"`
@@ -606,6 +627,25 @@ func applyModBinaryEdits(cfg *config.Config, mods []string, force bool) (int, er
 			return 0, fmt.Errorf("create backup: %w", err)
 		}
 		fmt.Printf("  Created backup: %s\n", backupPath)
+	}
+
+	// Verify clean backup MD5
+	backupBin, err := os.ReadFile(backupPath)
+	if err != nil {
+		return 0, fmt.Errorf("read backup: %w", err)
+	}
+	
+	backupHash := md5.Sum(backupBin)
+	backupMD5 := hex.EncodeToString(backupHash[:])
+	
+	if backupMD5 == CLEAN_CLIENT_MD5 {
+		fmt.Printf("  ✓ Clean WoW 3.3.5a client verified (MD5: %s)\n", backupMD5)
+	} else {
+		fmt.Printf("  ⚠ Warning: Backup MD5 %s does not match expected clean client MD5 %s\n", backupMD5, CLEAN_CLIENT_MD5)
+		fmt.Printf("  Expected: %s\n", CLEAN_CLIENT_MD5)
+		fmt.Printf("  Got:      %s\n", backupMD5)
+		fmt.Printf("  This may indicate a non-standard WoW 3.3.5a (12340) client.\n")
+		fmt.Printf("  Patches may not apply correctly. Proceed with caution.\n")
 	}
 
 	// Apply edits

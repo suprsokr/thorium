@@ -47,10 +47,24 @@ mods/my-mod/binary-edits/
 ## How It Works
 
 1. During `thorium build`, each `.json` file in `binary-edits/` is processed
-2. The patch ID is `<mod-name>/<filename>` (e.g., `custom-packets/load-clientextensions.json`)
-3. If the patch ID is not in `shared/binary_edits_applied.json`, the patch is applied
-4. Bytes are written to `Wow.exe` at the specified addresses
-5. The patch ID is recorded in the tracker
+2. The backup file `Wow.exe.clean` is verified against the expected MD5 hash for clean WoW 3.3.5a (12340)
+3. The patch ID is `<mod-name>/<filename>` (e.g., `custom-packets/load-clientextensions.json`)
+4. If the patch ID is not in `shared/binary_edits_applied.json`, the patch is applied
+5. Bytes are written to `Wow.exe` at the specified addresses
+6. The patch ID is recorded in the tracker
+
+### MD5 Verification
+
+Thorium automatically verifies that `Wow.exe.clean` matches the expected MD5 hash for a clean WoW 3.3.5a (12340) client:
+
+- **Expected MD5**: `45892bdedd0ad70aed4ccd22d9fb5984`
+- If the backup matches, you'll see: `✓ Clean WoW 3.3.5a client verified`
+- If it doesn't match, you'll see a warning but patching will continue
+
+This ensures you're starting from a known-good client, which is important because:
+- Patches are designed for specific byte offsets in the clean client
+- Using a modified or different version may cause patches to fail or corrupt the executable
+- The warning helps you diagnose issues if patches don't work as expected
 
 ## Tracking
 
@@ -70,22 +84,33 @@ Applied edits are tracked in `shared/binary_edits_applied.json`:
 
 ## Reapplying Edits
 
-To reapply edits (e.g., after restoring from backup):
+To reapply only binary edits (e.g., after restoring from backup):
+
+```bash
+thorium build --force-binary-edits
+```
+
+Or to force reapply everything (binary edits, server patches, assets, scripts):
 
 ```bash
 thorium build --force
 ```
-
-This ignores the tracker and reapplies all binary edits.
 
 ## Backup and Restore
 
 When binary edits are first applied, a backup is created:
 
 ```
-WoW.exe        ← Patched executable
-Wow.exe.clean  ← Original backup
+Wow.exe        ← Patched executable
+Wow.exe.clean  ← Original backup (verified against MD5)
 ```
+
+The backup file should be your original, unmodified WoW 3.3.5a (12340) client. If you need to obtain a clean client:
+
+1. Download the official WoW 3.3.5a (build 12340) client
+2. Verify its MD5: `md5sum Wow.exe` (Linux/Mac) or `Get-FileHash Wow.exe -Algorithm MD5` (Windows)
+3. Expected MD5: `45892bdedd0ad70aed4ccd22d9fb5984`
+4. Copy it to your client directory as `Wow.exe.clean`
 
 To restore the original:
 
@@ -99,7 +124,11 @@ Then delete the relevant entries from `shared/binary_edits_applied.json` if you 
 
 - **Test patches** on a copy of `Wow.exe` first
 - **Document your patches** - include comments in a README explaining what each patch does
-- **Check the MD5** - The clean WoW 3.3.5a (12340) client has MD5 `45892bdedd0ad70aed4ccd22d9fb5984`
+- **Verify your client** - The clean WoW 3.3.5a (12340) client has MD5 `45892bdedd0ad70aed4ccd22d9fb5984`
+  - On Linux/Mac: `md5sum Wow.exe`
+  - On Windows: `Get-FileHash Wow.exe -Algorithm MD5`
+- **Keep a clean backup** - Store `Wow.exe.clean_original` as an untouched backup if you need to restore to pristine state
+- **Use descriptive names** - Name your binary edit files clearly (e.g., `load-custom-dll.json`, `enable-feature-x.json`)
 
 ## See Also
 

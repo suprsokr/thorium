@@ -77,13 +77,17 @@ Applied patches are tracked in `shared/server_patches_applied.json`:
 
 ## Reapplying Patches
 
-To reapply patches (e.g., after reverting):
+To reapply only server patches (e.g., after reverting):
+
+```bash
+thorium build --force-server-patches
+```
+
+Or to force reapply everything (binary edits, server patches, assets, scripts):
 
 ```bash
 thorium build --force
 ```
-
-This ignores the tracker and attempts to reapply all patches.
 
 ## Reverting Patches
 

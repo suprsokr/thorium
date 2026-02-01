@@ -139,7 +139,7 @@ Commands:
   export             Export modified DBCs from database
   extract            Extract DBC/LuaXML from client MPQs
   import             Import DBC files into database
-  dist               Create distributable zip with client MPQs and server SQL
+  dist               Create player distribution zip (client MPQs + exe)
   status             Show status of migrations and mods
   version            Show version information
   help               Show this help message
@@ -161,8 +161,9 @@ Examples:
   thorium import dbc                    # Import DBCs to database
   thorium import dbc --source /path     # Import from custom path
   thorium import dbc --database mydb    # Import to specific database
-  thorium dist                          # Create distributable zip of all mods
-  thorium dist --mod my-mod             # Create zip for specific mod
+  thorium dist                          # Create player distribution zip
+  thorium dist --mod my-mod             # Distribution for specific mod
+  thorium dist --no-exe                 # Skip including wow.exe
   thorium status                        # Show migration status
 
 Script Types:

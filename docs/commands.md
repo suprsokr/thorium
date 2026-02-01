@@ -49,7 +49,11 @@ thorium build --force            # Reapply patches/edits even if tracked as appl
 - `--skip-export` - Skip DBC export
 - `--skip-package` - Skip MPQ packaging
 - `--skip-server` - Skip copying DBCs to server
-- `--force` - Reapply binary-edits and server-patches even if already applied
+- `--force` - Reapply all tracked items (binary-edits, server-patches, assets, scripts)
+- `--force-binary-edits` - Reapply binary edits only
+- `--force-server-patches` - Reapply server patches only
+- `--force-assets` - Recopy assets only
+- `--force-scripts` - Redeploy scripts only
 
 ### `apply`
 

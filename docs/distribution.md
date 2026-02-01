@@ -1,138 +1,107 @@
 # Distribution
 
-The `dist` command creates a distributable package containing everything needed to deploy your mods to a client and server.
+The `dist` command creates a player-ready distribution package containing client files (MPQs and optionally wow.exe). This is what you distribute to players who want to play on your modded server.
+
+For mod source distribution (for other modders), host your mod on GitHub and use the upcoming `thorium get-mod <github-repo>` command.
 
 ## Usage
 
 ```bash
-# Create a zip of all mods (client MPQs + server SQL)
+# Create a player distribution zip with MPQs
 thorium dist
 
-# Create a zip for a specific mod
+# Create a distribution for a specific mod
 thorium dist --mod my-mod
 
-# Client-only distribution (just MPQs, no server SQL)
-thorium dist --client-only
-
-# Include patched wow.exe in distribution
-thorium dist --client-only --include-exe
+# Skip including wow.exe (even if binary edits were applied)
+thorium dist --no-exe
 
 # Specify output path
-thorium dist --output ./releases/my-release.zip
+thorium dist --output ./releases/v1.0.0.zip
 ```
 
-### Distribution Types
-
-| Flags | Contents | Use Case |
-|-------|----------|----------|
-| (default) | Client MPQs + Server SQL | Server admins deploying full mod |
-| `--client-only` | Client MPQs only | Players connecting to modded server |
-| `--include-exe` | Also include patched wow.exe | Players needing client patches |
+**Note:** The command automatically checks `mods/shared/binary_edits_applied.json` and includes `wow.exe` from your WoTLK path if any binary edits have been applied (unless `--no-exe` is specified).
 
 ## Output Structure
 
 The generated zip contains:
 
 ```
-thorium_dist_20250129_143052.zip
-├── README.txt              # Installation instructions
-├── client/
-│   ├── patch-T.MPQ             # DBC modifications (goes in Data/)
-│   └── patch-enUS-T.MPQ        # LuaXML/interface modifications (goes in Data/enUS/)
-└── server/
-    ├── sql/
-    │   └── my-mod/
-    │       ├── 20250129_120000_add_npc.sql
-    │       └── 20250129_120000_add_npc.rollback.sql
-    └── scripts/
-        └── my-mod/
-            └── spell_fire_blast.cpp
+thorium_dist_20250201_143052.zip
+├── README.txt              # Installation instructions for players
+├── patch-T.MPQ             # DBC modifications (if built)
+├── patch-enUS-T.MPQ        # LuaXML/interface modifications (if built)
+└── wow.exe                 # Patched executable (if mod has binary edits)
 ```
 
-**Note:** Binary edits, assets, and server patches from mods are applied during `thorium build` and are not included in the distribution. Recipients should either:
-- Use thorium with the same mods to apply patches themselves
-- Receive pre-patched client/server files separately
+**Note:** 
+- MPQ files are only included if you've run `thorium build` first to generate them.
+- `wow.exe` is automatically included if `mods/shared/binary_edits_applied.json` shows any applied binary edits.
+- Use `--no-exe` flag to skip including wow.exe even if binary edits were applied.
+- If no MPQ files exist, the command will inform you and not create a zip.
 
-## Installation (for recipients)
+## Installation (for players)
 
-### Client
+Players should follow these steps to install your mod:
 
-Copy MPQ files to the appropriate WoW `Data/` directories:
+### 1. Backup
+
+Backup the existing WoW 3.3.5a installation before proceeding.
+
+### 2. Copy files
+
+Extract the zip and copy files to the WoW folder:
 
 ```
 WoW 3.3.5a/
+├── wow.exe                 ← Copy if included in distribution
 └── Data/
-    ├── patch-T.MPQ         ← DBC patch (Data/)
+    ├── patch-T.MPQ         ← Copy to Data/
     └── enUS/
-        └── patch-enUS-T.MPQ  ← LuaXML patch (Data/<locale>/)
+        └── patch-enUS-T.MPQ  ← Copy to Data/<locale>/
 ```
 
-**Note:** Replace `enUS` with your client's locale (e.g., `enGB`, `deDE`, `frFR`).
+**Important:** Replace `enUS` with the client's locale (e.g., `enGB`, `deDE`, `frFR`).
 
-### Server
+### 3. Connect
 
-#### 1. Apply SQL migrations
-
-Run the SQL files against the world database in order:
-
-```bash
-# Apply migrations (skip .rollback.sql files)
-mysql -u root -p world < server/sql/my-mod/20250129_120000_add_npc.sql
-mysql -u root -p world < server/sql/my-mod/20250129_130000_add_quest.sql
-```
-
-To undo changes, run the rollback files in reverse order:
-
-```bash
-mysql -u root -p world < server/sql/my-mod/20250129_130000_add_quest.rollback.sql
-mysql -u root -p world < server/sql/my-mod/20250129_120000_add_npc.rollback.sql
-```
-
-#### 2. Install scripts (if included)
-
-If the mod includes C++ scripts, copy them to your TrinityCore source:
-
-```bash
-# Copy scripts to TrinityCore Custom directory
-cp -r server/scripts/my-mod/* /path/to/TrinityCore/src/server/scripts/Custom/
-
-# Rebuild TrinityCore
-cd /path/to/TrinityCore/build
-make -j$(nproc)
-
-# Restart server
-systemctl restart worldserver  # or your restart method
-```
-
-Scripts are compiled into the server binary, so a rebuild is required.
-
+Launch WoW and connect to your server. The client will load the custom MPQ files automatically.
 
 ## What's Included
 
-| Content | Source | Install Location |
-|---------|--------|------------------|
-| DBC MPQ | Built from DBC database exports | `Data/patch-T.MPQ` |
-| LuaXML MPQ | Built from mod LuaXML files + addons | `Data/<locale>/patch-<locale>-T.MPQ` |
-| World SQL | From `mods/<mod>/world_sql/` | Apply to world database |
-| Scripts | From `mods/<mod>/scripts/` | Copy to TrinityCore Custom/, rebuild |
+| Content | Source | Install Location | Notes |
+|---------|--------|------------------|-------|
+| DBC MPQ | Built from DBC database exports | `Data/patch-T.MPQ` | Only if DBCs were modified |
+| LuaXML MPQ | Built from mod LuaXML files + addons | `Data/<locale>/patch-<locale>-T.MPQ` | Only if addons/interface mods exist |
+| wow.exe | From WoTLK path in config.json | Root folder | Automatically included if binary edits were applied |
 
 **Notes:**
 - DBC SQL migrations are applied to the DBC database and exported to DBC files, which are then packaged into the client MPQ. The SQL files themselves are not distributed since the client needs the compiled DBC format.
-- Scripts are distributed as C++ source files. Recipients must copy them to their TrinityCore source and rebuild the server.
-- Binary edits (`binary-edits/`), server patches (`server-patches/`), and assets (`assets/`) are applied locally during `thorium build` and are not included in distributions.
+- MPQ files are built by `thorium build` and stored at the paths specified in `config.json` (`output.dbc_mpq` and `output.luaxml_mpq`).
+- `wow.exe` is automatically detected and included by checking `mods/shared/binary_edits_applied.json` for any applied binary edits. Use `--no-exe` to skip this.
 
-## Workflow
+## Typical Workflow
 
-A typical release workflow:
+A typical release workflow for sharing your mod with players:
 
 ```bash
-# 1. Build everything (applies migrations, exports DBCs, creates MPQs)
+# 1. Build everything (applies migrations, exports DBCs, creates MPQs, patches binaries)
 thorium build
 
-# 2. Test locally
+# 2. Test locally to ensure everything works
 
-# 3. Create distribution package
+# 3. Create player distribution package
 thorium dist --output ./releases/v1.0.0.zip
 
-# 4. Share the zip with players/server admins
+# 4. Share the zip with players (upload to website, Discord, etc.)
 ```
+
+## Mod Source Distribution (for modders)
+
+The `dist` command is for **player distributions only**. If you want to share your mod source code with other modders, you should:
+
+1. Host your mod on GitHub (the mod folder structure with scripts/, assets/, luaxml/, etc.)
+2. Other modders can clone/download your mod
+3. They run `thorium build` in their workspace to compile and apply your mod
+
+Future versions will include `thorium get-mod <github-repo>` to automate fetching and installing mods from GitHub.

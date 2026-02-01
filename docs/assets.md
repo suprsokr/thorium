@@ -141,11 +141,13 @@ Assets are tracked by MD5 hash in `shared/assets_applied.json`:
 }
 ```
 
-If the source file's MD5 matches the tracked hash, the copy is skipped. Use `--force` to copy anyway:
+If the source file's MD5 matches the tracked hash, the copy is skipped. Use `--force-assets` to copy anyway:
 
 ```bash
-thorium build --force
+thorium build --force-assets
 ```
+
+Or use `--force` to reapply everything (binary edits, server patches, assets, scripts).
 
 ## Notes
 
@@ -167,7 +169,6 @@ thorium build --force
 |---------|--------|--------|
 | Goes into MPQ | No | Yes |
 | Can be in subdirectories | Yes | Yes (must match Interface/ structure) |
-| Tracking | By MD5 hash | Not tracked |
 | Best for | DLLs, loose files | Addons, UI modifications |
 
 For client-side Lua/XML modifications, use `luaxml/` instead - those files are packaged into an MPQ and loaded by the client's MPQ system.
