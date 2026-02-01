@@ -72,10 +72,27 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Load config for other commands
+	// Load config for other commands (some commands can work without it)
 	cfg, err := config.Load(configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+	configLoadErr := err
+
+	// Commands that can work without config.json (when given direct paths)
+	switch cmd {
+	case "patch":
+		// patch can work without config if a direct exe path is provided
+		if configLoadErr != nil {
+			cfg = nil // Pass nil config, let patch handle it
+		}
+		if err := commands.Patch(cfg, subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// All other commands require config
+	if configLoadErr != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", configLoadErr)
 		fmt.Fprintf(os.Stderr, "Run 'thorium init' to create a workspace.\n")
 		os.Exit(1)
 	}
@@ -105,8 +122,6 @@ func main() {
 		cmdErr = commands.Extract(cfg, subArgs)
 	case "import":
 		cmdErr = commands.Import(cfg, subArgs)
-	case "patch":
-		cmdErr = commands.Patch(cfg, subArgs)
 	case "dist":
 		cmdErr = commands.Dist(cfg, subArgs)
 	default:
@@ -165,6 +180,8 @@ Examples:
   thorium import dbc --database mydb    # Import to specific database
   thorium dist                          # Create distributable zip of all mods
   thorium dist --mod my-mod             # Create zip for specific mod
+  thorium patch                         # Patch WoW client (uses config.json)
+  thorium patch /path/to/WoW.exe        # Patch specific exe (no config needed)
   thorium status                        # Show migration status
 
 Script Types:

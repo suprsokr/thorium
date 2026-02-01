@@ -19,16 +19,32 @@ func Patch(cfg *config.Config, args []string) error {
 	dryRun := fs.Bool("dry-run", false, "Show what would be patched without applying")
 	verbose := fs.Bool("verbose", false, "Verbose output")
 	restore := fs.Bool("restore", false, "Restore from backup")
+	patchesFlag := fs.String("patches", "", "Comma-separated list of patch names to apply (default: all)")
 	fs.Parse(args)
 
-	if cfg.WoTLK.Path == "" || cfg.WoTLK.Path == "${WOTLK_PATH}" {
-		return fmt.Errorf("wotlk.path not configured in config.json")
-	}
+	var wowExe string
 
-	// Find WoW executable
-	wowExe := findWoWExecutable(cfg.WoTLK.Path)
-	if wowExe == "" {
-		return fmt.Errorf("WoW executable not found in %s", cfg.WoTLK.Path)
+	// Check if a direct path was provided as a positional argument
+	if fs.NArg() > 0 {
+		// Direct path to exe provided - use it without requiring config.json
+		wowExe = fs.Arg(0)
+		if _, err := os.Stat(wowExe); os.IsNotExist(err) {
+			return fmt.Errorf("WoW executable not found: %s", wowExe)
+		}
+	} else {
+		// No direct path - use config.json
+		if cfg == nil {
+			return fmt.Errorf("no WoW executable path provided and no config.json found\nUsage: thorium patch [/path/to/WoW.exe]")
+		}
+		if cfg.WoTLK.Path == "" || cfg.WoTLK.Path == "${WOTLK_PATH}" {
+			return fmt.Errorf("wotlk.path not configured in config.json\nAlternatively, provide path directly: thorium patch /path/to/WoW.exe")
+		}
+
+		// Find WoW executable in the configured directory
+		wowExe = findWoWExecutable(cfg.WoTLK.Path)
+		if wowExe == "" {
+			return fmt.Errorf("WoW executable not found in %s", cfg.WoTLK.Path)
+		}
 	}
 
 	fmt.Println("=== Client Patcher ===")
@@ -65,12 +81,22 @@ func Patch(cfg *config.Config, args []string) error {
 		return nil
 	}
 
-	// Apply all patches
+	// Parse selected patches
+	var selectedPatches []string
+	if *patchesFlag != "" {
+		// Parse comma-separated list
+		for _, p := range splitAndTrim(*patchesFlag, ",") {
+			selectedPatches = append(selectedPatches, p)
+		}
+	}
+
+	// Apply patches
 	opts := patcher.PatchOptions{
-		WowExePath: wowExe,
-		BackupPath: wowExe + ".clean",
-		OutputPath: wowExe,
-		Verbose:    *verbose,
+		WowExePath:      wowExe,
+		BackupPath:      wowExe + ".clean",
+		OutputPath:      wowExe,
+		Verbose:         *verbose,
+		SelectedPatches: selectedPatches,
 	}
 
 	if err := patcher.ApplyPatches(opts); err != nil {
@@ -79,6 +105,52 @@ func Patch(cfg *config.Config, args []string) error {
 
 	fmt.Println("\n✓ Patches applied successfully")
 	return nil
+}
+
+// splitAndTrim splits a string by delimiter and trims each part
+func splitAndTrim(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := []string{}
+	for _, p := range splitString(s, sep) {
+		trimmed := trimString(p)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+func splitString(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	result := []string{}
+	current := ""
+	for i := 0; i < len(s); i++ {
+		if i+len(sep) <= len(s) && s[i:i+len(sep)] == sep {
+			result = append(result, current)
+			current = ""
+			i += len(sep) - 1
+		} else {
+			current += string(s[i])
+		}
+	}
+	result = append(result, current)
+	return result
+}
+
+func trimString(s string) string {
+	start := 0
+	end := len(s)
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+	return s[start:end]
 }
 
 // findWoWExecutable finds the WoW executable in the client directory

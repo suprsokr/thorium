@@ -123,7 +123,6 @@ thorium build --mod %s
 	return nil
 }
 
-
 // validateModName checks if a mod name is valid
 func validateModName(name string) error {
 	if name == "" {

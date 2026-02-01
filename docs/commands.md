@@ -147,11 +147,14 @@ Flags:
 Apply binary patches to the WoW client executable. See [client-patcher.md](client-patcher.md) for details.
 
 ```bash
-thorium patch                    # Apply all patches
+thorium patch                    # Apply all patches (uses wotlk.path from config.json)
+thorium patch /path/to/WoW.exe   # Apply to specific exe (no config.json needed)
 thorium patch --list             # List available patches
 thorium patch --dry-run          # Preview what would be applied
 thorium patch --restore          # Restore from backup
 ```
+
+**Note:** When providing a direct path to `WoW.exe`, no `config.json` is required. This is useful for patching clients outside of a Thorium workspace.
 
 ## Utilities
 

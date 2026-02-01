@@ -5,8 +5,11 @@ The client patcher applies binary patches to the WoW 3.3.5a (12340) executable. 
 ## Usage
 
 ```bash
-# Apply all patches
+# Apply all patches (uses wotlk.path from config.json)
 thorium patch
+
+# Apply patches to a specific exe (no config.json needed)
+thorium patch /path/to/WoW.exe
 
 # List available patches
 thorium patch --list
@@ -50,7 +53,7 @@ The `custom-packets` patch enables bidirectional communication between client ad
 
 ### How It Works
 
-This patch injects `ClientExtensions.dll` (from [TSWoW](https://github.com/tswow/tswow)) into the WoW client at startup. The DLL:
+This patch injects `ClientExtensions.dll` into the WoW client at startup. The DLL:
 
 1. **Hooks client networking functions** using Microsoft Detours
 2. **Intercepts custom opcodes** (0x102 for server→client, 0x51F for client→server)
@@ -65,8 +68,8 @@ When you run `thorium init`, a `CustomPackets` addon is automatically created th
 
 ### Credits
 
-- **ClientExtensions.dll**: [TSWoW team](https://github.com/tswow/tswow) (MIT License)
-- Pre-built binary from: https://github.com/tswow/misc/releases
+- **ClientExtensions.dll**: Based on [TSWoW](https://github.com/tswow/tswow) client-extensions (MIT License)
+- Source and releases: https://github.com/suprsokr/wotlk-custom-packets
 
 See [custom-packets.md](custom-packets.md) for complete documentation including:
 

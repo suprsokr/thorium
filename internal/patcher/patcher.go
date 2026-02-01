@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"thorium-cli/assets"
 )
 
 // MD5 hash of clean WoW 3.3.5a (12340) client
@@ -18,11 +19,11 @@ const CleanClientMD5 = "45892bdedd0ad70aed4ccd22d9fb5984"
 
 // PatchOptions contains options for applying patches
 type PatchOptions struct {
-	WowExePath string
-	BackupPath string
-	OutputPath string
-	PatchNames []string // If empty, applies all patches
-	Verbose    bool
+	WowExePath      string
+	BackupPath      string
+	OutputPath      string
+	SelectedPatches []string // If empty, applies all patches
+	Verbose         bool
 }
 
 // copyOnNoTarget copies source to dest only if dest doesn't exist
@@ -137,11 +138,11 @@ func ApplyPatches(opts PatchOptions) error {
 
 	// Filter to requested patches (or use all if none specified)
 	var patchesToApply []PatchCategory
-	if len(opts.PatchNames) == 0 {
+	if len(opts.SelectedPatches) == 0 {
 		patchesToApply = allPatches
 	} else {
 		for _, cat := range allPatches {
-			for _, requestedName := range opts.PatchNames {
+			for _, requestedName := range opts.SelectedPatches {
 				if cat.Name == requestedName {
 					patchesToApply = append(patchesToApply, cat)
 					break
@@ -149,7 +150,7 @@ func ApplyPatches(opts PatchOptions) error {
 			}
 		}
 		if len(patchesToApply) == 0 {
-			return fmt.Errorf("no patches found for names: %v", opts.PatchNames)
+			return fmt.Errorf("no patches found for names: %v", opts.SelectedPatches)
 		}
 	}
 
@@ -176,10 +177,10 @@ func ApplyPatches(opts PatchOptions) error {
 
 	// Step 8: Copy ClientExtensions.dll if custom-packets patch was applied
 	needsDLL := false
-	if len(opts.PatchNames) == 0 {
+	if len(opts.SelectedPatches) == 0 {
 		needsDLL = true // applying all patches
 	} else {
-		for _, name := range opts.PatchNames {
+		for _, name := range opts.SelectedPatches {
 			if name == "custom-packets" {
 				needsDLL = true
 				break
@@ -193,34 +194,13 @@ func ApplyPatches(opts PatchOptions) error {
 		
 		logVerbose(opts.Verbose, "Copying ClientExtensions.dll to: %s", dllPath)
 		
-		// Find the DLL in the assets directory
-		// Try multiple locations: embedded in binary dir, or in source tree
-		execPath, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("get executable path: %w", err)
-		}
-		execDir := filepath.Dir(execPath)
-		
-		dllSourcePaths := []string{
-			filepath.Join(execDir, "assets", "ClientExtensions.dll"),
-			filepath.Join(execDir, "..", "assets", "ClientExtensions.dll"),
-			"assets/ClientExtensions.dll",
+		// Get embedded DLL
+		dllData := assets.GetClientExtensionsDLL()
+		if len(dllData) == 0 {
+			return fmt.Errorf("ClientExtensions.dll is empty in embedded assets")
 		}
 		
-		var dllData []byte
-		found := false
-		for _, sourcePath := range dllSourcePaths {
-			dllData, err = os.ReadFile(sourcePath)
-			if err == nil {
-				found = true
-				logVerbose(opts.Verbose, "Found ClientExtensions.dll at: %s", sourcePath)
-				break
-			}
-		}
-		
-		if !found {
-			return fmt.Errorf("ClientExtensions.dll not found. Looked in: %v", dllSourcePaths)
-		}
+		logVerbose(opts.Verbose, "Using embedded ClientExtensions.dll (%d bytes)", len(dllData))
 		
 		if err := os.WriteFile(dllPath, dllData, 0644); err != nil {
 			return fmt.Errorf("write ClientExtensions.dll: %w", err)

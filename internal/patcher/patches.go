@@ -45,14 +45,6 @@ func GetClientPatches() []PatchCategory {
 			},
 		},
 		{
-			Name:        "wowtime-fix",
-			Description: "Fixes calendar and date calculation bugs that cause crashes or incorrect dates after January 1, 2031. Essential for long-term server operation.",
-			Patches: []Patch{
-				// Time calculation overflow fix
-				{Address: 0x43A5E0, Values: []uint8{0xB8, 0x00, 0x00, 0x00, 0x00, 0xC3}},
-			},
-		},
-		{
 			// Credits: TSWoW team (tswow-scripts/util/ClientPatches.ts)
 			//          https://www.wowmodding.net/files/file/283-wow-335-patcher-custom-item-fix/
 			Name:        "item-dbc-disabler",
@@ -139,37 +131,30 @@ func GetCustomPacketsPatches() PatchCategory {
 		Name:        "custom-packets",
 		Description: "Enables custom packet communication between client and server via ClientExtensions.dll injection. Allows addons to send/receive custom opcodes for extended functionality like custom UI, real-time data sync, and server-driven features.",
 		Patches: []Patch{
-			// Patch 1: Hook LoadLibraryA call for d3d9.dll to inject our DLL
-			// At 0x56DE90, change the jump target to our code cave
-			{Address: 0x56DE90, Values: []uint8{
-				0xE9, 0x23, 0x5A, 0x1C, 0x00, // JMP to 0x3738b8 (our code cave)
-				// pad old instruction
-				0x90,
+			// Patch 1: Hook LoadLibraryA call to jump to our code cave
+			// At 0x28e19c, replace LoadLibraryA call with jump to code cave
+			{Address: 0x28e19c, Values: []uint8{
+				0xE9, 0x19, 0x57, 0x0E, 0x00, // JMP to 0x3738b8 (our code cave)
+				0x90, // pad old instruction
 			}},
 			
-			// Patch 2: Code cave that loads ClientExtensions.dll
-			// This runs when the game loads d3d9.dll, loading our DLL alongside it
+			// Patch 2: Code cave that loads both d3d9.dll and ClientExtensions.dll
+			// This runs when the game tries to load d3d9.dll, loading both dlls
 			{Address: 0x3738b8, Values: []uint8{
-				// short jump 26 bytes (past code cave)
-				0xEB, 0x26,
-				// call "LoadLibraryA" (for d3d9.dll) (this is what we jump to)
-				0xFF, 0x15, 0x48, 0xF2, 0x9D, 0x00,
-				// push all registers
-				0x60,
-				// push "ClientExtensions.dll" string address (see below)
-				0x68, 0x71, 0x42, 0x9E, 0x00,
-				// call "LoadLibraryA" (for ClientExtensions.dll)
-				0xFF, 0x15, 0x48, 0xF2, 0x9D, 0x00,
-				// pop all registers
-				0x61,
-				// jump back
-				0xE9, 0xD0, 0xA8, 0xF1, 0xFF,
+				0xEB, 0x26, // short jump 26 bytes (past code cave)
+				0xFF, 0x15, 0x48, 0xF2, 0x9D, 0x00, // call "LoadLibraryA" (for d3d9.dll)
+				0x60, // push all registers
+				0x68, 0x71, 0x42, 0x9E, 0x00, // push "ClientExtensions.dll" string address
+				0xFF, 0x15, 0x48, 0xF2, 0x9D, 0x00, // call "LoadLibraryA" (for ClientExtensions.dll)
+				0x61, // pop all registers
+				0xE9, 0xD0, 0xA8, 0xF1, 0xFF, // jump back
 			}},
 			
 			// Patch 3: "ClientExtensions.dll" string in unused memory space
+			// String MUST be null-terminated for LoadLibraryA to work
 			{Address: 0x5e2a71, Values: []uint8{
-				0x43, 0x6C, 0x69, 0x65, 0x6E, 0x74, 0x45, 0x78, 0x74, 0x65, 0x6E, 0x73, 0x69, 0x6F, 0x6E, 0x73, 0x2E, 0x64, 0x6C, 0x6C, 0x00,
-				// "ClientExtensions.dll\0" in hex
+				0x43, 0x6C, 0x69, 0x65, 0x6E, 0x74, 0x45, 0x78, 0x74, 0x65, 0x6E, 0x73, 0x69, 0x6F, 0x6E, 0x73, 0x2E, 0x64, 0x6C, 0x6C,
+				0x00, // null terminator - REQUIRED for LoadLibraryA
 			}},
 		},
 	}
