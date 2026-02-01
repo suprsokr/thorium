@@ -156,6 +156,37 @@ thorium patch --restore          # Restore from backup
 
 **Note:** When providing a direct path to `WoW.exe`, no `config.json` is required. This is useful for patching clients outside of a Thorium workspace.
 
+## Server Patching
+
+### `patch-server`
+
+Apply source patches to TrinityCore. These patches modify TrinityCore C++ source code to enable features like custom packets that require core support.
+
+```bash
+thorium patch-server --list                  # List available server patches
+thorium patch-server --status                # Show which patches are applied
+thorium patch-server apply custom-packets    # Apply custom-packets support
+thorium patch-server revert custom-packets   # Revert the patch
+thorium patch-server apply custom-packets --dry-run  # Preview without applying
+```
+
+**Available patches:**
+
+| Patch | Description |
+|-------|-------------|
+| `custom-packets` | Adds custom packet support (opcode 0x51F) for addon-server communication |
+
+**Important:** After applying or reverting a server patch, you must rebuild TrinityCore:
+
+```bash
+cd /path/to/TrinityCore/build
+make -j$(nproc)
+```
+
+Patches are tracked in `shared/server_patches_applied.json` in your workspace.
+
+**Configuration:** Set `trinitycore.source_path` in `config.json` or the `TC_SOURCE_PATH` environment variable.
+
 ## Utilities
 
 ### `status`

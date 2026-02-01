@@ -38,18 +38,18 @@ thorium_dist_20250129_143052.zip
 ├── README.txt              # Installation instructions
 ├── client/
 │   ├── patch-T.MPQ             # DBC modifications (goes in Data/)
-│   └── patch-enUS-T.MPQ        # LuaXML/interface modifications (goes in Data/enUS/)
+│   ├── patch-enUS-T.MPQ        # LuaXML/interface modifications (goes in Data/enUS/)
+│   └── ClientExtensions.dll    # Custom packets DLL (if custom-packets enabled)
 └── server/
     ├── sql/
     │   └── my-mod/
     │       ├── 20250129_120000_add_npc.sql
     │       ├── 20250129_120000_add_npc.rollback.sql
-    │       ├── 20250129_130000_add_quest.sql
-    │       └── 20250129_130000_add_quest.rollback.sql
-    └── scripts/
-        └── my-mod/
-            ├── spell_fire_blast.cpp
-            └── npc_custom_vendor.cpp
+    ├── scripts/
+    │   └── my-mod/
+    │       ├── spell_fire_blast.cpp
+    └── patches/
+        └── custom-packets.patch  # TrinityCore source patch (if custom-packets enabled)
 ```
 
 ## Installation (for recipients)
@@ -105,6 +105,37 @@ systemctl restart worldserver  # or your restart method
 
 Scripts are compiled into the server binary, so a rebuild is required.
 
+#### 3. Apply server patches (if included)
+
+If the mod includes server patches (e.g., for custom packets support):
+
+```bash
+# Navigate to TrinityCore source
+cd /path/to/TrinityCore
+
+# Apply the patch
+git apply /path/to/server/patches/custom-packets.patch
+
+# Rebuild TrinityCore
+cd build
+make -j$(nproc)
+```
+
+To revert a patch:
+```bash
+git apply -R /path/to/server/patches/custom-packets.patch
+```
+
+#### 4. Install ClientExtensions.dll (if included)
+
+If the mod uses custom packets, copy `ClientExtensions.dll` to the WoW directory:
+
+```bash
+cp client/ClientExtensions.dll /path/to/WoW/
+```
+
+**Note:** Players also need a patched `WoW.exe` that loads this DLL. Either include the patched exe with `--include-exe`, or have players run `thorium patch` themselves.
+
 ## What's Included
 
 | Content | Source | Install Location |
@@ -113,11 +144,26 @@ Scripts are compiled into the server binary, so a rebuild is required.
 | LuaXML MPQ | Built from mod LuaXML files + addons | `Data/<locale>/patch-<locale>-T.MPQ` |
 | World SQL | From `mods/<mod>/world_sql/` | Apply to world database |
 | Scripts | From `mods/<mod>/scripts/` | Copy to TrinityCore Custom/, rebuild |
+| ClientExtensions.dll | Embedded in thorium | `WoW.exe` directory (client) |
+| Server patches | From thorium assets | Apply to TrinityCore source, rebuild |
 
 **Notes:**
 - DBC SQL migrations are applied to the DBC database and exported to DBC files, which are then packaged into the client MPQ. The SQL files themselves are not distributed since the client needs the compiled DBC format.
 - Scripts are distributed as C++ source files. Recipients must copy them to their TrinityCore source and rebuild the server.
 - The LuaXML MPQ includes the `CustomPackets` addon (created during `thorium init`) and any addons created with `thorium create-addon`.
+
+### Custom Packets Files
+
+If your mod uses custom packets (`extensions.custom_packets.enabled: true` in config.json), the distribution includes:
+
+**Client-side:**
+- `ClientExtensions.dll` - Copy to WoW directory (next to `WoW.exe`)
+- The patched `WoW.exe` (if `--include-exe` flag used)
+
+**Server-side:**
+- `patches/custom-packets.patch` - Apply to TrinityCore source with `git apply`
+
+See [custom-packets.md](custom-packets.md) for full setup instructions.
 
 ## Workflow
 

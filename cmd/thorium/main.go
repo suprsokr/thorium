@@ -88,6 +88,16 @@ func main() {
 			os.Exit(1)
 		}
 		os.Exit(0)
+	case "patch-server":
+		// patch-server can work with TC_SOURCE_PATH env var if no config
+		if configLoadErr != nil {
+			cfg = nil
+		}
+		if err := commands.PatchServer(cfg, subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 
 	// All other commands require config
@@ -158,6 +168,7 @@ Commands:
   import             Import DBC files into database
   dist               Create distributable zip with client MPQs and server SQL
   patch              Apply patches to WoW client executable
+  patch-server       Apply patches to TrinityCore source (e.g., custom-packets)
   status             Show status of migrations and mods
   version            Show version information
   help               Show this help message
@@ -182,6 +193,9 @@ Examples:
   thorium dist --mod my-mod             # Create zip for specific mod
   thorium patch                         # Patch WoW client (uses config.json)
   thorium patch /path/to/WoW.exe        # Patch specific exe (no config needed)
+  thorium patch-server --list           # List available server patches
+  thorium patch-server apply custom-packets  # Apply custom packets support to TC
+  thorium patch-server revert custom-packets # Revert the patch
   thorium status                        # Show migration status
 
 Script Types:

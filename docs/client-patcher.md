@@ -51,6 +51,10 @@ Works with stock TrinityCore 3.3.5a (handles `CMSG_ITEM_QUERY_SINGLE` out of the
 
 The `custom-packets` patch enables bidirectional communication between client addons and server scripts using custom opcodes. This allows you to build features like custom UI, real-time data sync, and server-driven client behavior.
 
+**Important:** This feature requires BOTH client patches AND server patches:
+- **Client:** `thorium patch` (applies this patch + installs ClientExtensions.dll)
+- **Server:** `thorium patch-server apply custom-packets` (patches TrinityCore source)
+
 ### How It Works
 
 This patch injects `ClientExtensions.dll` into the WoW client at startup. The DLL:
@@ -63,6 +67,11 @@ This patch injects `ClientExtensions.dll` into the WoW client at startup. The DL
 When you run `thorium patch`, it:
 - Patches `WoW.exe` to load `ClientExtensions.dll` alongside `d3d9.dll`
 - Copies `ClientExtensions.dll` to your WoW directory
+
+When you run `thorium patch-server apply custom-packets`, it:
+- Patches TrinityCore source to register opcode 0x51F
+- Adds `OnCustomPacketReceive` hook to `ServerScript` for your handlers
+- Requires rebuilding TrinityCore after applying
 
 When you run `thorium init`, a `CustomPackets` addon is automatically created that provides the client-side Lua API.
 

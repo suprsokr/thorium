@@ -4,11 +4,14 @@ Custom Packets enable bidirectional communication between WoW client addons and 
 
 ## Overview
 
-The system consists of three parts:
+The system consists of four parts:
 
-1. **Client-side Lua API** - `CustomPackets` addon for sending/receiving packets in addons
-2. **Server-side C++ handlers** - TrinityCore scripts that process custom packets
-3. **Binary patches** - Client patches that enable custom opcode handling
+1. **Client-side Lua API** - `CustomxPackets` addon for sending/receiving packets in addons
+2. **Client binary patch** - Injects `ClientExtensions.dll` to handle custom opcodes
+3. **Server source patch** - Patches TrinityCore to register opcode 0x51F
+4. **Server-side C++ handlers** - Your scripts that process custom packets
+
+**Important:** Custom packets require patches to BOTH the WoW client AND TrinityCore server. Stock TrinityCore does not support custom opcodes out of the box.
 
 ## Architecture
 
@@ -141,14 +144,22 @@ This generates a script template in `mods/my-mod/scripts/`.
 #include "Player.h"
 #include "WorldPacket.h"
 
+// Define your opcodes (must match client-side)
+enum MyOpcodes
+{
+    CYCM_MY_REQUEST  = 1001,  // Client -> Server
+    CYSM_MY_RESPONSE = 1002   // Server -> Client
+};
+
 class MyCustomPacketHandler : public ServerScript
 {
 public:
     MyCustomPacketHandler() : ServerScript("MyCustomPacketHandler") { }
 
-    void OnCustomPacket(Player* player, uint16 opcode, WorldPacket& packet) override
+    // This hook is added by the custom-packets server patch
+    void OnCustomPacketReceive(Player* player, uint16 opcode, WorldPacket& packet) override
     {
-        if (opcode != 1001)
+        if (opcode != CYCM_MY_REQUEST)
             return;
 
         // Read data in same order client wrote it
@@ -160,23 +171,16 @@ public:
         packet >> flags >> count >> multiplier >> name;
 
         // Process the data
-        LOG_INFO("custom", "Received from {}: flags={}, count={}, name={}",
+        TC_LOG_INFO("custom", "Received from {}: flags={}, count={}, name={}",
             player->GetName(), flags, count, name);
 
-        // Send response back to client
-        WorldPacket response(0x102, 100);  // Server->Client opcode
-        
-        // Write header
-        response << uint16(0);     // FragmentID
-        response << uint16(1);     // TotalFrags
-        response << uint16(1002);  // Your response opcode
-        
-        // Write payload
+        // Build response payload (just the data, no header needed)
+        WorldPacket response;
         response << uint32(player->GetGUID().GetCounter());
-        response << "Response from server";
-        response << uint8(0);  // Null terminator for string
+        response << std::string("Response from server");
         
-        player->SendDirectMessage(&response);
+        // SendCustomPacket handles the transport header automatically
+        player->SendCustomPacket(CYSM_MY_RESPONSE, &response);
     }
 };
 
@@ -202,9 +206,31 @@ This creates the `CustomPackets` addon in `shared/luaxml/luaxml_source/Interface
 thorium patch
 ```
 
-This applies the `custom-packets` patch (among others) that enables custom opcode handling.
+This applies the `custom-packets` patch (among others) that:
+- Patches `WoW.exe` to load `ClientExtensions.dll`
+- Copies `ClientExtensions.dll` to your WoW directory
 
-### 3. Create Your Addon
+### 3. Apply Server Patches
+
+```bash
+# List available server patches
+thorium patch-server --list
+
+# Apply the custom-packets patch to TrinityCore source
+thorium patch-server apply custom-packets
+
+# Rebuild TrinityCore
+cd /path/to/TrinityCore/build && make -j$(nproc)
+```
+
+This patches TrinityCore to:
+- Register opcode `0x51F` (`CMSG_CUSTOM_PACKET`)
+- Add `OnCustomPacketReceive` hook to `ServerScript`
+- Add `Player::SendCustomPacket(opcode, data)` helper for easy responses
+
+**Note:** You must rebuild TrinityCore after applying the server patch.
+
+### 4. Create Your Addon
 
 ```bash
 thorium create-addon --mod my-mod MyFeatureUI
@@ -220,72 +246,23 @@ Edit `mods/my-mod/luaxml/Interface/AddOns/MyFeatureUI/MyFeatureUI.toc`:
 main.lua
 ```
 
-### 4. Create Server Handler
+### 5. Create Server Handler
 
 ```bash
 thorium create-script --mod my-mod --type packet my_feature_protocol
 ```
 
-### 5. Build and Test
+### 6. Build and Test
 
 ```bash
 # Build client files (packages addons into MPQ)
 thorium build
 
-# Rebuild TrinityCore with your script
+# Rebuild TrinityCore with your script (if you added new scripts)
 cd /path/to/TrinityCore/build && make -j$(nproc)
 
 # Restart server and test in-game
 ```
-
-## Best Practices
-
-### Opcode Ranges
-
-Assign opcode ranges to avoid conflicts between mods:
-
-| Range | Purpose |
-|-------|---------|
-| 1-999 | Reserved for Thorium internals |
-| 1000-1999 | Mod A |
-| 2000-2999 | Mod B |
-| 3000-3999 | Mod C |
-
-### Error Handling
-
-Always provide defaults when reading:
-
-```lua
--- Good - handles truncated packets gracefully
-local value = reader:ReadUInt32(0)
-
--- The default is returned if read fails
-```
-
-### Versioning
-
-Include a version field at the start of your packets:
-
-```lua
--- Client
-packet:WriteUInt8(1)  -- Protocol version
-
--- Server
-uint8 version;
-packet >> version;
-if (version != 1) {
-    LOG_WARN("custom", "Unknown protocol version: {}", version);
-    return;
-}
-```
-
-### Large Data
-
-For large payloads, the system automatically fragments packets. However, consider:
-
-- Splitting logical chunks into separate packets
-- Using compression for very large data
-- Rate limiting to avoid flooding
 
 ## See Also
 

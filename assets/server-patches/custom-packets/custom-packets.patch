@@ -1,0 +1,175 @@
+# Custom Packets Support for TrinityCore 3.3.5a
+# 
+# This patch adds support for custom packet communication between
+# client addons and server scripts using opcode 0x51F.
+#
+# Compatible with ClientExtensions.dll from:
+# https://github.com/suprsokr/wotlk-custom-packets
+#
+# Apply with: git apply custom-packets.patch
+# Revert with: git apply -R custom-packets.patch
+
+diff --git a/src/server/game/Server/Protocol/Opcodes.h b/src/server/game/Server/Protocol/Opcodes.h
+--- a/src/server/game/Server/Protocol/Opcodes.h
++++ b/src/server/game/Server/Protocol/Opcodes.h
+@@ -1335,7 +1335,9 @@ enum Opcodes : uint16
+     CMSG_COMMENTATOR_SKIRMISH_QUEUE_COMMAND         = 0x51B,
+     SMSG_COMMENTATOR_SKIRMISH_QUEUE_RESULT1         = 0x51C,
+     SMSG_COMMENTATOR_SKIRMISH_QUEUE_RESULT2         = 0x51D,
+-    SMSG_MULTIPLE_MOVES                             = 0x51E, // uncompressed version of SMSG_COMPRESSED_MOVES
++    SMSG_MULTIPLE_MOVES                             = 0x51E,
++    CMSG_CUSTOM_PACKET                              = 0x51F, // Custom packet from client addon
++    SMSG_CUSTOM_PACKET                              = 0x102, // Custom packet to client addon
+     NUM_MSG_TYPES                                   = 0x520
+ };
+
+diff --git a/src/server/game/Server/Protocol/Opcodes.cpp b/src/server/game/Server/Protocol/Opcodes.cpp
+--- a/src/server/game/Server/Protocol/Opcodes.cpp
++++ b/src/server/game/Server/Protocol/Opcodes.cpp
+@@ -1437,6 +1437,7 @@ void OpcodeTable::Initialize()
+     /*0x51C*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_COMMENTATOR_SKIRMISH_QUEUE_RESULT1, STATUS_NEVER);
+     /*0x51D*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_COMMENTATOR_SKIRMISH_QUEUE_RESULT2, STATUS_NEVER);
+     /*0x51E*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_MULTIPLE_MOVES,   STATUS_NEVER);
++    /*0x51F*/ DEFINE_HANDLER(CMSG_CUSTOM_PACKET,                  STATUS_LOGGEDIN, PROCESS_INPLACE, &WorldSession::HandleCustomPacket);
+
+ #undef DEFINE_HANDLER
+
+diff --git a/src/server/game/Server/WorldSession.h b/src/server/game/Server/WorldSession.h
+--- a/src/server/game/Server/WorldSession.h
++++ b/src/server/game/Server/WorldSession.h
+@@ -1176,6 +1176,9 @@ class TC_GAME_API WorldSession
+         void HandleUpdateProjectilePosition(WorldPacket& recvPacket);
+         void HandleUpdateMissileTrajectory(WorldPacket& recvPacket);
+
++        // Custom Packets (Thorium)
++        void HandleCustomPacket(WorldPacket& recvPacket);
++
+     public:
+         QueryCallbackProcessor& GetQueryProcessor() { return _queryProcessor; }
+         TransactionCallback& AddTransactionCallback(TransactionCallback&& callback);
+
+diff --git a/src/server/game/Server/WorldSession.cpp b/src/server/game/Server/WorldSession.cpp
+--- a/src/server/game/Server/WorldSession.cpp
++++ b/src/server/game/Server/WorldSession.cpp
+@@ -1786,3 +1786,36 @@ bool WorldSession::IsKickRequired() const
+ 
+     return true;
+ }
++
++// Custom Packets (Thorium)
++// Handles custom packets from client addons using ClientExtensions.dll
++void WorldSession::HandleCustomPacket(WorldPacket& recvPacket)
++{
++    if (!_player)
++        return;
++
++    // Custom packet header format (from ClientExtensions.dll):
++    // uint16 fragmentId    - Fragment index (0 for single packets)
++    // uint16 totalFrags    - Total fragments (1 for single packets)
++    // uint16 innerOpcode   - The actual custom opcode
++    // [payload...]         - The packet data
++
++    if (recvPacket.size() < 6)
++    {
++        TC_LOG_ERROR("network", "Player {} sent malformed custom packet (size {})", 
++                     _player->GetName(), recvPacket.size());
++        return;
++    }
++
++    uint16 fragmentId, totalFrags, innerOpcode;
++    recvPacket >> fragmentId >> totalFrags >> innerOpcode;
++
++    // For now, only support single-fragment packets
++    if (totalFrags != 1 || fragmentId != 0)
++    {
++        TC_LOG_WARN("network", "Player {} sent fragmented custom packet (not yet supported)", 
++                    _player->GetName());
++        return;
++    }
++
++    // Fire script hook with the inner opcode and remaining payload
++    sScriptMgr->OnCustomPacketReceive(_player, innerOpcode, recvPacket);
++}
+
+diff --git a/src/server/game/Entities/Player/Player.h b/src/server/game/Entities/Player/Player.h
+--- a/src/server/game/Entities/Player/Player.h
++++ b/src/server/game/Entities/Player/Player.h
+@@ -1199,6 +1199,9 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
+         void SendDirectMessage(WorldPacket const* data) const;
+         void SendDirectMessage(WorldPacket&& data) const { SendDirectMessage(&data); }
+
++        // Custom Packets (Thorium) - sends a custom packet to the client addon
++        void SendCustomPacket(uint16 opcode, WorldPacket const* data = nullptr) const;
++
+         void SendChatMessage(std::string const& text, uint32 type = 0, uint32 language = 0, Player const* target = nullptr) const;
+         void SendChatMessageToPlayer(std::string const& text, uint32 type, uint32 language, Player const* target) const;
+
+diff --git a/src/server/game/Entities/Player/Player.cpp b/src/server/game/Entities/Player/Player.cpp
+--- a/src/server/game/Entities/Player/Player.cpp
++++ b/src/server/game/Entities/Player/Player.cpp
+@@ -6240,6 +6240,22 @@ void Player::SendDirectMessage(WorldPacket const* data) const
+     GetSession()->SendPacket(data);
+ }
+
++void Player::SendCustomPacket(uint16 opcode, WorldPacket const* data) const
++{
++    // Custom packet format (for ClientExtensions.dll):
++    // uint16 fragmentId    - Fragment index (0 for single packets)
++    // uint16 totalFrags    - Total fragments (1 for single packets)
++    // uint16 innerOpcode   - The actual custom opcode
++    // [payload...]         - The packet data
++
++    WorldPacket packet(SMSG_CUSTOM_PACKET, 6 + (data ? data->size() : 0));
++    packet << uint16(0);        // fragmentId (always 0 for single-fragment)
++    packet << uint16(1);        // totalFrags (always 1 for now)
++    packet << uint16(opcode);   // the custom opcode
++    if (data && data->size() > 0)
++        packet.append(data->contents(), data->size());
++    SendDirectMessage(&packet);
++}
++
+ void Player::SendChatMessage(std::string const& text, uint32 type /* = 0 */, uint32 language /* = 0 */, Player const* target /* = nullptr */) const
+ {
+     WorldPacket data;
+
+diff --git a/src/server/game/Scripting/ScriptMgr.h b/src/server/game/Scripting/ScriptMgr.h
+--- a/src/server/game/Scripting/ScriptMgr.h
++++ b/src/server/game/Scripting/ScriptMgr.h
+@@ -499,6 +499,9 @@ class TC_GAME_API ServerScript : public ScriptObject
+ 
+         // Called when a packet is received.
+         virtual void OnPacketReceive(WorldSession* /*session*/, WorldPacket& /*packet*/) { }
++
++        // Called when a custom packet is received from client addon
++        virtual void OnCustomPacketReceive(Player* /*player*/, uint16 /*opcode*/, WorldPacket& /*packet*/) { }
+ };
+
+ class TC_GAME_API WorldScript : public ScriptObject
+
+diff --git a/src/server/game/Scripting/ScriptMgr.cpp b/src/server/game/Scripting/ScriptMgr.cpp
+--- a/src/server/game/Scripting/ScriptMgr.cpp
++++ b/src/server/game/Scripting/ScriptMgr.cpp
+@@ -282,6 +282,12 @@ void ScriptMgr::OnPacketReceive(WorldSession* session, WorldPacket const& packet
+     FOREACH_SCRIPT(ServerScript)->OnPacketReceive(session, const_cast<WorldPacket&>(packet));
+ }
+
++void ScriptMgr::OnCustomPacketReceive(Player* player, uint16 opcode, WorldPacket& packet)
++{
++    ASSERT(player);
++    FOREACH_SCRIPT(ServerScript)->OnCustomPacketReceive(player, opcode, packet);
++}
++
+ void ScriptMgr::OnPacketSend(WorldSession* session, WorldPacket const& packet)
+ {
+     ASSERT(session);
+
+diff --git a/src/server/game/Scripting/ScriptMgr.h b/src/server/game/Scripting/ScriptMgr.h
+--- a/src/server/game/Scripting/ScriptMgr.h
++++ b/src/server/game/Scripting/ScriptMgr.h
+@@ -1699,6 +1699,7 @@ class TC_GAME_API ScriptMgr
+         void OnSocketClose(std::shared_ptr<WorldSocket> socket);
+         void OnPacketReceive(WorldSession* session, WorldPacket const& packet);
+         void OnPacketSend(WorldSession* session, WorldPacket const& packet);
++        void OnCustomPacketReceive(Player* player, uint16 opcode, WorldPacket& packet);
+
+     public: /* WorldScript */
