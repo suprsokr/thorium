@@ -47,7 +47,16 @@ See [docs/install.md](docs/install.md) for pre-built binaries or building from s
 
 ## Quick Start
 
-Create a new item mod from scratch:
+Install an existing mod from GitHub:
+
+```bash
+thorium init # Initialize workspace
+vim config.json # Configure paths and database connections
+thorium get https://github.com/suprsokr/thorium-custom-packets # Install a mod
+thorium build # Build the mod
+```
+
+Or create a new item mod from scratch:
 
 ```bash
 thorium init # Initialize workspace

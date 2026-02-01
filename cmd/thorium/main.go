@@ -93,6 +93,10 @@ func main() {
 		cmdErr = commands.Export(cfg, subArgs)
 	case "status":
 		cmdErr = commands.Status(cfg, subArgs)
+	case "get":
+		cmdErr = commands.Get(cfg, subArgs)
+	case "search":
+		cmdErr = commands.Search(cfg, subArgs)
 	case "create-mod":
 		cmdErr = commands.CreateMod(cfg, subArgs)
 	case "create-migration":
@@ -129,6 +133,8 @@ Global Flags:
 
 Commands:
   init               Initialize a new Thorium workspace
+  search [query]     Search the mod registry for available mods
+  get <url>          Install a mod from a GitHub repository
   create-mod <name>  Create a new mod with standard structure
   create-migration   Create a new SQL migration in a mod
   create-script      Create a new TrinityCore script in a mod
@@ -146,6 +152,14 @@ Commands:
 
 Examples:
   thorium init                          # Create new workspace in current directory
+  thorium search networking             # Search for mods related to networking
+  thorium search --tag lua-api          # Search for mods with specific tag
+  thorium search --tag ui --tag client-only  # Multiple tags (AND logic)
+  thorium search --name custom-packets  # Show details for specific mod
+  thorium search --tags                 # List all available tags
+  thorium get https://github.com/user/thorium-mod  # Install a mod from GitHub
+  thorium get https://github.com/user/repo --name my-mod  # Install with custom name
+  thorium get https://github.com/user/repo --update  # Update existing mod
   thorium create-mod my-mod             # Create a new mod
   thorium create-migration --mod my-mod --db world add_custom_npc
   thorium create-migration --mod my-mod --db dbc add_custom_item
