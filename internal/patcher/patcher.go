@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 // MD5 hash of clean WoW 3.3.5a (12340) client
@@ -171,6 +172,60 @@ func ApplyPatches(opts PatchOptions) error {
 	logVerbose(opts.Verbose, "Writing patched Wow.exe to: %s", opts.OutputPath)
 	if err := os.WriteFile(opts.OutputPath, wowbin, 0755); err != nil {
 		return fmt.Errorf("write patched exe: %w", err)
+	}
+
+	// Step 8: Copy ClientExtensions.dll if custom-packets patch was applied
+	needsDLL := false
+	if len(opts.PatchNames) == 0 {
+		needsDLL = true // applying all patches
+	} else {
+		for _, name := range opts.PatchNames {
+			if name == "custom-packets" {
+				needsDLL = true
+				break
+			}
+		}
+	}
+
+	if needsDLL {
+		clientDir := filepath.Dir(opts.WowExePath)
+		dllPath := filepath.Join(clientDir, "ClientExtensions.dll")
+		
+		logVerbose(opts.Verbose, "Copying ClientExtensions.dll to: %s", dllPath)
+		
+		// Find the DLL in the assets directory
+		// Try multiple locations: embedded in binary dir, or in source tree
+		execPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("get executable path: %w", err)
+		}
+		execDir := filepath.Dir(execPath)
+		
+		dllSourcePaths := []string{
+			filepath.Join(execDir, "assets", "ClientExtensions.dll"),
+			filepath.Join(execDir, "..", "assets", "ClientExtensions.dll"),
+			"assets/ClientExtensions.dll",
+		}
+		
+		var dllData []byte
+		found := false
+		for _, sourcePath := range dllSourcePaths {
+			dllData, err = os.ReadFile(sourcePath)
+			if err == nil {
+				found = true
+				logVerbose(opts.Verbose, "Found ClientExtensions.dll at: %s", sourcePath)
+				break
+			}
+		}
+		
+		if !found {
+			return fmt.Errorf("ClientExtensions.dll not found. Looked in: %v", dllSourcePaths)
+		}
+		
+		if err := os.WriteFile(dllPath, dllData, 0644); err != nil {
+			return fmt.Errorf("write ClientExtensions.dll: %w", err)
+		}
+		logVerbose(opts.Verbose, "ClientExtensions.dll installed successfully")
 	}
 
 	logVerbose(opts.Verbose, "Patches applied successfully!")

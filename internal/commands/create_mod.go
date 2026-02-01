@@ -16,7 +16,7 @@ import (
 // CreateMod creates a new mod with the standard directory structure
 func CreateMod(cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("create-mod", flag.ExitOnError)
-	noLuaXML := fs.Bool("no-luaxml", false, "Skip creating luaxml folder and copying source files")
+	noLuaXML := fs.Bool("no-luaxml", false, "Skip creating luaxml folder")
 	fs.Parse(args)
 
 	remaining := fs.Args()
@@ -75,20 +75,8 @@ func CreateMod(cfg *config.Config, args []string) error {
 		os.WriteFile(gitkeep, []byte{}, 0644)
 	}
 
-	// Copy luaxml_source files to mod's luaxml folder
-	if !*noLuaXML {
-		luaxmlSource := cfg.GetLuaXMLSourcePath()
-		modLuaXML := filepath.Join(modPath, "luaxml")
-
-		if _, err := os.Stat(luaxmlSource); err == nil {
-			count, err := copyLuaXMLSource(luaxmlSource, modLuaXML)
-			if err != nil {
-				fmt.Printf("  Warning: failed to copy luaxml source: %v\n", err)
-			} else if count > 0 {
-				fmt.Printf("  Copied %d LuaXML source files\n", count)
-			}
-		}
-	}
+	// Note: luaxml folder starts empty. Use 'thorium create-addon' to add custom addons,
+	// or 'thorium extract --mod <mod>' to copy specific interface files to modify.
 
 	// Create README
 	readme := fmt.Sprintf(`# %s
@@ -135,50 +123,6 @@ thorium build --mod %s
 	return nil
 }
 
-// copyLuaXMLSource copies all files from source to destination
-func copyLuaXMLSource(srcDir, dstDir string) (int, error) {
-	count := 0
-
-	err := filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if strings.HasPrefix(info.Name(), ".") {
-			return nil
-		}
-
-		// Get relative path
-		relPath, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return nil
-		}
-
-		// Create destination path
-		dstPath := filepath.Join(dstDir, relPath)
-
-		// Ensure destination directory exists
-		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
-			return err
-		}
-
-		// Copy file
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil // Skip unreadable files
-		}
-		if err := os.WriteFile(dstPath, data, 0644); err != nil {
-			return err
-		}
-
-		count++
-		return nil
-	})
-
-	return count, err
-}
 
 // validateModName checks if a mod name is valid
 func validateModName(name string) error {

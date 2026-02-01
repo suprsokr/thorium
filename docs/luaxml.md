@@ -128,37 +128,100 @@ mods/my-mod/luaxml/Interface/AddOns/MyAddon/
 └── main.lua       # Main addon code
 ```
 
-### CustomPackets Addon
+### TOC Files (Table of Contents)
 
-When you run `thorium init`, a `CustomPackets` addon is automatically created in `shared/luaxml/luaxml_source/Interface/AddOns/CustomPackets/`. This provides a Lua API for custom client-server communication.
+Every addon requires a `.toc` file that tells the client what to load. The TOC file must have the same name as the addon folder.
 
-Your addons can depend on it:
+**Basic TOC structure:**
 
 ```toc
 ## Interface: 30300
 ## Title: My Addon
+## Notes: A brief description of what this addon does
+## Author: Your Name
+## Version: 1.0.0
+
+main.lua
+core.lua
+ui.xml
+```
+
+**Common TOC fields:**
+- `## Interface:` - Client version (30300 for WotLK 3.3.5a)
+- `## Title:` - Display name in addon list
+- `## Notes:` - Short description
+- `## Author:` - Your name
+- `## Version:` - Addon version
+- `## Dependencies:` - Required addons (comma-separated)
+- `## OptionalDeps:` - Optional addons (loaded first if present)
+- `## LoadOnDemand:` - Set to 1 to load manually via `/addon load`
+- `## SavedVariables:` - Global variables to persist between sessions
+- `## SavedVariablesPerCharacter:` - Per-character saved variables
+
+### Addon Dependencies
+
+Use the `## Dependencies:` field to require other addons to load first. Multiple dependencies are comma-separated.
+
+**Example: Addon that uses CustomPackets**
+
+```toc
+## Interface: 30300
+## Title: My Network Addon
 ## Dependencies: CustomPackets
 
 main.lua
 ```
 
-Then use the API:
+**Example: Multiple dependencies**
+
+```toc
+## Interface: 30300
+## Title: Advanced UI
+## Dependencies: CustomPackets, Blizzard_CombatLog
+## OptionalDeps: LibStub, AceAddon-3.0
+
+main.lua
+```
+
+**Important notes about dependencies:**
+- If a dependency is missing, the addon won't load
+- Use `## OptionalDeps:` for soft dependencies
+- Dependencies must be loaded before your addon
+- Use exact addon names (case-sensitive)
+
+### CustomPackets Addon
+
+When you run `thorium init`, a `CustomPackets` addon is automatically created in `shared/luaxml/luaxml_source/Interface/AddOns/CustomPackets/`. This provides a Lua API for custom client-server communication.
+
+**The CustomPackets addon is automatically included in the MPQ whenever you build with LuaXML modifications.** You don't need to copy it into your mod.
+
+To use CustomPackets in your addon, add it as a dependency in your TOC:
+
+```toc
+## Interface: 30300
+## Title: My Server Communication Addon
+## Dependencies: CustomPackets
+
+main.lua
+```
+
+Then use the API in your Lua code:
 
 ```lua
--- Send custom packet
+-- Send custom packet to server
 local packet = CreateCustomPacket(1001, 0)
 packet:WriteUInt32(12345)
 packet:WriteString("Hello")
 packet:Send()
 
--- Receive custom packet
+-- Receive custom packet from server
 OnCustomPacket(1002, function(reader)
     local value = reader:ReadUInt32()
     print("Got: " .. value)
 end)
 ```
 
-See [custom-packets.md](custom-packets.md) for more details.
+See [custom-packets.md](custom-packets.md) for the complete API reference.
 
 ## Notes
 

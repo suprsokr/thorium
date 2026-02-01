@@ -30,7 +30,7 @@ Build features that need real-time client-server communication. Send custom data
 Generate TrinityCore script templates for spells, creatures, and packet handlers. Thorium sets up the boilerplate scripts and distributes into your Trinity Core server so you can focus on logic.
 
 ### Binary Patches
-Optional client patches for development: custom login screens, extended Lua APIs, custom packet support, and more. See [docs/client-patcher.md](docs/client-patcher.md).
+Optional client patches for development: custom login screens, extended Lua APIs, custom packet support via DLL injection, and more. See [docs/client-patcher.md](docs/client-patcher.md).
 
 ### Mod Bundling
 Bundle changes into "mods": Collect DBC, database, LuaXML, and server-side scripts into mods that can be built and distributed easily. Each mod is self-contained with its own migrations, scripts, and assets.

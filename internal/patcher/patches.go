@@ -131,54 +131,45 @@ func GetAllPatchNames() []string {
 }
 
 // GetCustomPacketsPatches returns patches specifically for custom packets functionality
-// These patches enable the client to send/receive custom opcodes
-// Ported from TSWoW client-extensions
+// These patches inject ClientExtensions.dll which provides custom packet protocol support.
+// Based on TSWoW client-extensions (MIT License, Copyright (c) 2021 tswow)
+// DLL source: https://github.com/tswow/tswow/tree/master/misc/client-extensions
 func GetCustomPacketsPatches() PatchCategory {
 	return PatchCategory{
 		Name:        "custom-packets",
-		Description: "Enables custom packet communication between client and server. Allows addons to send/receive custom opcodes for extended functionality like custom UI, real-time data sync, and server-driven features.",
+		Description: "Enables custom packet communication between client and server via ClientExtensions.dll injection. Allows addons to send/receive custom opcodes for extended functionality like custom UI, real-time data sync, and server-driven features.",
 		Patches: []Patch{
-			// Hook NetClient::HandleData to intercept custom packets
-			// These patches redirect specific opcodes to custom handling code
-			
-			// Patch 1: Hook the packet dispatcher to check for custom opcode (0x102 - CMSG_EMOTE repurposed)
-			// This NOPs out the normal handler check and inserts a jump to our custom handler space
-			{Address: 0x55D6A0, Values: []uint8{
-				0x81, 0xF9, 0x02, 0x01, 0x00, 0x00, // CMP ECX, 0x102 (SERVER_TO_CLIENT_OPCODE)
-				0x75, 0x06,                         // JNZ +6 (skip if not our opcode)
-				0xE9, 0x00, 0x00, 0x00, 0x00,       // JMP to custom handler (patched at runtime)
-				0x90,                               // NOP padding
+			// Patch 1: Hook LoadLibraryA call for d3d9.dll to inject our DLL
+			// At 0x56DE90, change the jump target to our code cave
+			{Address: 0x56DE90, Values: []uint8{
+				0xE9, 0x23, 0x5A, 0x1C, 0x00, // JMP to 0x3738b8 (our code cave)
+				// pad old instruction
+				0x90,
 			}},
 			
-			// Patch 2: Custom packet send hook for outgoing packets (0x51F)
-			// Allows Lua to construct and send custom packets
-			{Address: 0x55D6B0, Values: []uint8{
-				0x81, 0xF9, 0x1F, 0x05, 0x00, 0x00, // CMP ECX, 0x51F (CLIENT_TO_SERVER_OPCODE)
-				0x75, 0x06,                         // JNZ +6
-				0xE9, 0x00, 0x00, 0x00, 0x00,       // JMP to custom send handler
-				0x90,                               // NOP
+			// Patch 2: Code cave that loads ClientExtensions.dll
+			// This runs when the game loads d3d9.dll, loading our DLL alongside it
+			{Address: 0x3738b8, Values: []uint8{
+				// short jump 26 bytes (past code cave)
+				0xEB, 0x26,
+				// call "LoadLibraryA" (for d3d9.dll) (this is what we jump to)
+				0xFF, 0x15, 0x48, 0xF2, 0x9D, 0x00,
+				// push all registers
+				0x60,
+				// push "ClientExtensions.dll" string address (see below)
+				0x68, 0x71, 0x42, 0x9E, 0x00,
+				// call "LoadLibraryA" (for ClientExtensions.dll)
+				0xFF, 0x15, 0x48, 0xF2, 0x9D, 0x00,
+				// pop all registers
+				0x61,
+				// jump back
+				0xE9, 0xD0, 0xA8, 0xF1, 0xFF,
 			}},
 			
-			// Patch 3: Extend Lua API registration to include custom packet functions
-			// This adds entries to the Lua function table for CreateCustomPacket and OnCustomPacket
-			{Address: 0x55D6C0, Values: []uint8{
-				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, // NOPs - placeholder for Lua registration
-				0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
-				0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
-			}},
-			
-			// Patch 4: Custom packet buffer allocation
-			// Increases the network buffer size to accommodate larger custom packets
-			{Address: 0x55D6D8, Values: []uint8{
-				0xB8, 0x30, 0x75, 0x00, 0x00, // MOV EAX, 30000 (MAX_FRAGMENT_SIZE)
-				0x90, 0x90,                   // NOP padding
-			}},
-			
-			// Patch 5: Fragment reassembly support
-			// Allows multi-fragment custom packets to be reassembled
-			{Address: 0x55D6E0, Values: []uint8{
-				0x90, 0x90, 0x90, 0x90, // NOPs for fragment handling
-				0x90, 0x90, 0x90, 0x90,
+			// Patch 3: "ClientExtensions.dll" string in unused memory space
+			{Address: 0x5e2a71, Values: []uint8{
+				0x43, 0x6C, 0x69, 0x65, 0x6E, 0x74, 0x45, 0x78, 0x74, 0x65, 0x6E, 0x73, 0x69, 0x6F, 0x6E, 0x73, 0x2E, 0x64, 0x6C, 0x6C, 0x00,
+				// "ClientExtensions.dll\0" in hex
 			}},
 		},
 	}

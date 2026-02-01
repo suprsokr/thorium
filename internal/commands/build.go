@@ -164,6 +164,27 @@ func Build(cfg *config.Config, args []string) error {
 
 		// Package LuaXML MPQ from modified files
 		if len(allModifiedLuaXML) > 0 {
+			// Automatically include CustomPackets addon from shared if it exists
+			customPacketsDir := filepath.Join(cfg.GetLuaXMLSourcePath(), "Interface", "AddOns", "CustomPackets")
+			if _, err := os.Stat(customPacketsDir); err == nil {
+				// Add CustomPackets files to the package
+				err := filepath.Walk(customPacketsDir, func(path string, info os.FileInfo, err error) error {
+					if err != nil || info.IsDir() || strings.HasPrefix(info.Name(), ".") {
+						return nil
+					}
+					relPath, _ := filepath.Rel(cfg.GetLuaXMLSourcePath(), path)
+					allModifiedLuaXML = append(allModifiedLuaXML, mpq.ModifiedLuaXMLFile{
+						ModName:  "shared",
+						FilePath: path,
+						RelPath:  relPath,
+					})
+					return nil
+				})
+				if err != nil {
+					return fmt.Errorf("collect CustomPackets files: %w", err)
+				}
+			}
+
 			count, err := builder.PackageLuaXMLFromMods(allModifiedLuaXML)
 			if err != nil {
 				return fmt.Errorf("package LuaXML: %w", err)
