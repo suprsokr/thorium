@@ -88,6 +88,8 @@ func Build(cfg *config.Config, args []string) error {
 		}
 		if len(tables) > 0 {
 			fmt.Printf("Exported %d DBC table(s)\n", len(tables))
+		} else {
+			fmt.Println("  No modified DBCs found")
 		}
 		fmt.Println()
 	}
@@ -116,6 +118,9 @@ func Build(cfg *config.Config, args []string) error {
 			}
 		}
 	}
+	if len(allModifiedLuaXML) == 0 {
+		fmt.Println("  No LuaXML modifications found in mods")
+	}
 	fmt.Println()
 
 	// Step 4: Deploy Scripts to TrinityCore
@@ -131,6 +136,7 @@ func Build(cfg *config.Config, args []string) error {
 	}
 
 	// Step 5: Package and distribute
+	var dbcCount, luaxmlCount int
 	if !*skipPackage {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 5: Packaging and Distributing      │")
@@ -150,23 +156,28 @@ func Build(cfg *config.Config, args []string) error {
 		}
 
 		// Package DBC MPQ
-		dbcCount, err := builder.PackageDBCs()
+		count, err := builder.PackageDBCs()
 		if err != nil {
 			return fmt.Errorf("package DBCs: %w", err)
 		}
-		if dbcCount > 0 {
-			fmt.Printf("Created DBC MPQ with %d file(s)\n", dbcCount)
-		}
+		dbcCount = count
 
 		// Package LuaXML MPQ from modified files
 		if len(allModifiedLuaXML) > 0 {
-			luaxmlCount, err := builder.PackageLuaXMLFromMods(allModifiedLuaXML)
+			count, err := builder.PackageLuaXMLFromMods(allModifiedLuaXML)
 			if err != nil {
 				return fmt.Errorf("package LuaXML: %w", err)
 			}
-			if luaxmlCount > 0 {
-				fmt.Printf("Created LuaXML MPQ with %d file(s)\n", luaxmlCount)
-			}
+			luaxmlCount = count
+		}
+
+		// Print a nice summary of what was packaged
+		if dbcCount > 0 && luaxmlCount > 0 {
+			fmt.Printf("Created MPQ with DBC and LuaXML files and copied to client\n")
+		} else if dbcCount > 0 {
+			fmt.Printf("Created MPQ with DBC files and copied to client\n")
+		} else if luaxmlCount > 0 {
+			fmt.Printf("Created MPQ with LuaXML files and copied to client\n")
 		}
 	}
 
@@ -176,13 +187,19 @@ func Build(cfg *config.Config, args []string) error {
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 
-	// Print summary
-	fmt.Println("Output locations:")
-	if cfg.Server.DBCPath != "" {
-		fmt.Printf("  Server DBCs: %s\n", cfg.Server.DBCPath)
+	// Print summary - only show what was actually built
+	if dbcCount > 0 || luaxmlCount > 0 {
+		fmt.Println("Output locations:")
+		if cfg.Server.DBCPath != "" && dbcCount > 0 {
+			fmt.Printf("  Server DBCs: %s\n", cfg.Server.DBCPath)
+		}
+		if dbcCount > 0 {
+			fmt.Printf("  Client DBC MPQ: %s/%s\n", cfg.GetClientDataPath(), cfg.Output.DBCMPQ)
+		}
+		if luaxmlCount > 0 {
+			fmt.Printf("  Client LuaXML MPQ: %s/%s\n", cfg.GetClientLocalePath(), cfg.GetMPQName(cfg.Output.LuaXMLMPQ))
+		}
 	}
-	fmt.Printf("  Client DBC MPQ: %s/%s\n", cfg.GetClientDataPath(), cfg.Output.DBCMPQ)
-	fmt.Printf("  Client LuaXML MPQ: %s/%s\n", cfg.GetClientLocalePath(), cfg.GetMPQName(cfg.Output.LuaXMLMPQ))
 
 	return nil
 }

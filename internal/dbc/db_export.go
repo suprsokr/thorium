@@ -71,11 +71,10 @@ func ExportDBCFromEmbedded(db *sql.DB, cfg *Config, metaFile string) (string, er
     }
 
     if (currentCS == storedCS) && cfg.Options.UseVersioning {
-        log.Printf("Skipping %s: no changes detected", tableName)
-        return "", nil  // Not exported, no error
+        return "", nil  // Not exported, no error (silent skip)
     }
     
-    log.Printf("Exporting table %s to DBC...\n", tableName)
+    log.Printf("Exporting table %s to DBC...", tableName)
     
     orderClause := buildOrderBy(meta.SortOrder)
     

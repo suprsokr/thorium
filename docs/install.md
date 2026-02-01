@@ -115,7 +115,7 @@ This creates a `config.json` file. Edit it to configure your paths and database 
     }
   },
   "server": {
-    "dbc_path": "${TC_SERVER_PATH}/data/dbc"
+    "dbc_path": "${TC_SERVER_PATH:-/home/peacebloom/server}/bin/dbc"
   }
 }
 ```

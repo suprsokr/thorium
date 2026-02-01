@@ -182,11 +182,17 @@ func (c *Config) applyDefaults() {
 	}
 
 	// TrinityCore defaults
+	// Empty strings from expansion should use defaults too
 	if c.TrinityCore.SourcePath == "" {
-		c.TrinityCore.SourcePath = getEnvOrDefault("TC_SOURCE_PATH", "")
+		c.TrinityCore.SourcePath = getEnvOrDefault("TC_SOURCE_PATH", "/home/peacebloom/TrinityCore")
 	}
 	if c.TrinityCore.ScriptsPath == "" && c.TrinityCore.SourcePath != "" {
 		c.TrinityCore.ScriptsPath = filepath.Join(c.TrinityCore.SourcePath, "src", "server", "scripts", "Custom")
+	}
+
+	// Server defaults
+	if c.Server.DBCPath == "" {
+		c.Server.DBCPath = getEnvOrDefault("TC_SERVER_PATH", "/home/peacebloom/server") + "/bin/dbc"
 	}
 
 	// Output defaults
@@ -262,7 +268,7 @@ func (c *Config) GetClientLocalePath() string {
 func DefaultConfig() *Config {
 	return &Config{
 		WoTLK: WoTLKConfig{
-			Path:   "${WOTLK_PATH}",
+			Path:   "${WOTLK_PATH:-/wotlk}",
 			Locale: "enUS",
 		},
 		Databases: DatabasesConfig{
@@ -282,11 +288,11 @@ func DefaultConfig() *Config {
 			},
 		},
 		Server: ServerConfig{
-			DBCPath: "${TC_SERVER_PATH}/bin/dbc",
+			DBCPath: "${TC_SERVER_PATH:-/home/peacebloom/server}/bin/dbc",
 		},
 		TrinityCore: TrinityConfig{
-			SourcePath:  "${TC_SOURCE_PATH}",
-			ScriptsPath: "${TC_SOURCE_PATH}/src/server/scripts/Custom",
+			SourcePath:  "${TC_SOURCE_PATH:-/home/peacebloom/TrinityCore}",
+			ScriptsPath: "${TC_SOURCE_PATH:-/home/peacebloom/TrinityCore}/src/server/scripts/Custom",
 		},
 		Extensions: ExtensionsConfig{
 			CustomPackets: CustomPacketsConfig{
