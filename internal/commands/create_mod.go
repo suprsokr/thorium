@@ -16,7 +16,6 @@ import (
 // CreateMod creates a new mod with the standard directory structure
 func CreateMod(cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("create-mod", flag.ExitOnError)
-	noLuaXML := fs.Bool("no-luaxml", false, "Skip creating luaxml folder")
 	fs.Parse(args)
 
 	remaining := fs.Args()
@@ -50,11 +49,7 @@ func CreateMod(cfg *config.Config, args []string) error {
 		filepath.Join(modPath, "server-patches"),
 		filepath.Join(modPath, "binary-edits"),
 		filepath.Join(modPath, "assets"),
-	}
-
-	// Only create luaxml folder if not skipped
-	if !*noLuaXML {
-		dirs = append(dirs, filepath.Join(modPath, "luaxml"))
+		filepath.Join(modPath, "luaxml"),
 	}
 
 	for _, dir := range dirs {
@@ -72,9 +67,7 @@ func CreateMod(cfg *config.Config, args []string) error {
 		filepath.Join(modPath, "server-patches"),
 		filepath.Join(modPath, "binary-edits"),
 		filepath.Join(modPath, "assets"),
-	}
-	if !*noLuaXML {
-		gitkeepDirs = append(gitkeepDirs, filepath.Join(modPath, "luaxml"))
+		filepath.Join(modPath, "luaxml"),
 	}
 	for _, dir := range gitkeepDirs {
 		gitkeep := filepath.Join(dir, ".gitkeep")
