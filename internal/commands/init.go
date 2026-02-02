@@ -6,13 +6,20 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"thorium-cli/internal/config"
+	"thorium-cli/internal/database"
 )
 
 // Init initializes a new Thorium workspace
 func Init(configPath string, args []string) error {
+	// Check if this is a subcommand
+	if len(args) > 0 && args[0] == "db" {
+		return InitDB(configPath, args[1:])
+	}
+
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
 	force := fs.Bool("force", false, "Overwrite existing files")
 	fs.Parse(args)
@@ -95,55 +102,121 @@ Thumbs.db
 	// Create README
 	readme := `# Thorium Workspace
 
-A TrinityCore modding workspace.
+A TrinityCore modding workspace created with [Thorium](https://github.com/suprsokr/thorium).
 
 ## Structure
 
 ` + "```" + `
 .
-├── config.json           # Workspace configuration
+├── config.json              # Workspace configuration
+├── .gitignore               # Git ignore rules
 ├── shared/
 │   ├── dbc/
-│   │   ├── dbc_source/   # Original DBCs (extract with: thorium extract --dbc)
-│   │   └── dbc_out/      # Modified DBCs (exported from database)
+│   │   ├── dbc_source/      # Original DBCs (if using DBC workflow)
+│   │   └── dbc_out/         # Modified DBCs (if using DBC workflow)
 │   ├── luaxml/
-│   │   └── luaxml_source/  # Baseline LuaXML (extract with: thorium extract --luaxml)
-│   └── migrations_applied/ # Tracks applied migrations
-└── mods/
+│   │   └── luaxml_source/   # Original LuaXML (if extracted)
+│   └── migrations_applied/  # Tracks applied SQL migrations
+└── mods/                    # Your mods go here
     └── your-mod/
-        ├── dbc_sql/      # DBC database migrations
-        ├── world_sql/    # World database migrations
-        └── luaxml/       # Client UI modifications
+        ├── dbc_sql/         # DBC database migrations (optional)
+        ├── world_sql/       # World database migrations (optional)
+        ├── scripts/         # TrinityCore C++ scripts (optional)
+        ├── server-patches/  # TrinityCore source patches (optional)
+        ├── binary-edits/    # Client binary patches (optional)
+        ├── assets/          # Files to copy to client (optional)
+        └── luaxml/          # Client UI modifications (optional)
 ` + "```" + `
 
 ## Quick Start
 
 ` + "```" + `bash
-# Configure (edit config.json with your paths)
+# 1. Configure paths (or use Peacebloom: https://github.com/suprsokr/peacebloom)
 vim config.json
 
-# Extract original files from WoW client
-thorium extract --dbc --luaxml
-
-# Create a new mod
+# 2. Create your first mod
 thorium create-mod my-first-mod
 
-# Build all mods
+# 3. Start modding!
+# For addons:
+thorium create-addon --mod my-first-mod MyAddon
+
+# For World database changes:
+thorium create-migration --mod my-first-mod --db world "add custom npc"
+
+# For DBC changes (requires DBC workflow setup - see below):
+thorium create-migration --mod my-first-mod --db dbc "custom spell"
+
+# 4. Build and package
 thorium build
 
-# Check status
+# 5. Check status
 thorium status
+
+# 6. Create a distributable package
+thorium dist --mod my-first-mod
 ` + "```" + `
+
+## DBC Workflow (Optional)
+
+Only set this up if your mod modifies client-side data (spells, items, creatures, zones, etc.).
+
+Many mods (like custom addons or server-only changes) don't need this!
+
+` + "```" + `bash
+# One-command setup
+thorium init db
+
+# This automatically:
+# - Creates the dbc and dbc_source databases
+# - Extracts DBCs from your WoW client
+# - Imports DBCs to dbc_source
+# - Copies dbc_source to dbc
+# (Note: world database is managed by TrinityCore)
+
+# Now DBC migrations will work
+thorium build dbc_sql
+` + "```" + `
+
+### Why Two DBC Databases?
+
+- **dbc_source**: Pristine baseline, never modified. Used for creating clean distribution packages.
+- **dbc**: Development database where your migrations are applied and tested.
+
+During distribution, Thorium temporarily applies migrations to ` + "`dbc_source`" + `, exports only the changed DBCs, then rolls back to keep it pristine.
 
 ## Configuration
 
-Edit ` + "`config.json`" + ` to set:
+The ` + "`config.json`" + ` file uses environment variables with fallback defaults:
 
-- ` + "`wotlk.path`" + `: Path to your WoW 3.3.5 client
-- ` + "`databases`" + `: MySQL connection settings
-- ` + "`server.dbc_path`" + `: Where to copy server DBCs
+- ` + "`wotlk.path`" + `: Path to your WoW 3.3.5 client (default: ` + "`${WOTLK_PATH:-/wotlk}`" + `)
+- ` + "`wotlk.locale`" + `: Client locale (default: ` + "`enUS`" + `)
+- ` + "`databases.*`" + `: MySQL connection settings
+- ` + "`server.dbc_path`" + `: Where to copy server DBCs (default: ` + "`${TC_SERVER_PATH}/bin/dbc`" + `)
+- ` + "`trinitycore.source_path`" + `: TrinityCore source directory for patches
+- ` + "`trinitycore.scripts_path`" + `: Where to deploy C++ scripts
 
-Environment variables can be used: ` + "`${VAR:-default}`" + `
+Set environment variables in your shell or use [Peacebloom](https://github.com/suprsokr/peacebloom):
+
+` + "```" + `bash
+export WOTLK_PATH="/home/me/WoW-3.3.5"
+export TC_SOURCE_PATH="/home/me/TrinityCore"
+export TC_SERVER_PATH="/home/me/server"
+export MYSQL_HOST="127.0.0.1"
+` + "```" + `
+
+## Documentation
+
+Full documentation: https://github.com/suprsokr/thorium/tree/main/docs
+
+- [Installation](https://github.com/suprsokr/thorium/blob/main/docs/install.md)
+- [Initialization](https://github.com/suprsokr/thorium/blob/main/docs/init.md)
+- [Mods](https://github.com/suprsokr/thorium/blob/main/docs/mods.md)
+- [Commands](https://github.com/suprsokr/thorium/blob/main/docs/commands.md)
+- [DBC Files](https://github.com/suprsokr/thorium/blob/main/docs/dbc.md)
+- [SQL Migrations](https://github.com/suprsokr/thorium/blob/main/docs/sql-migrations.md)
+- [Scripts](https://github.com/suprsokr/thorium/blob/main/docs/scripts.md)
+- [Distribution](https://github.com/suprsokr/thorium/blob/main/docs/distribution.md)
 `
 	readmePath := filepath.Join(workspaceRoot, "README.md")
 	if _, err := os.Stat(readmePath); os.IsNotExist(err) || *force {
@@ -157,10 +230,177 @@ Environment variables can be used: ` + "`${VAR:-default}`" + `
 	fmt.Println("✓ Workspace initialized!")
 	fmt.Println()
 	fmt.Println("Next steps:")
-	fmt.Println("  1. Edit config.json with your paths and database settings")
-	fmt.Println("  2. Run: thorium extract --dbc --luaxml")
-	fmt.Println("  3. Run: thorium create-mod my-first-mod")
-	fmt.Println("  4. Run: thorium build")
+	fmt.Println("  1. Edit config.json with your paths (or use Peacebloom: https://github.com/suprsokr/peacebloom)")
+	fmt.Println("  2. Create your first mod: thorium create-mod my-mod")
+	fmt.Println("  3. Start building!")
+	fmt.Println()
+	fmt.Println("Note: DBC databases will be automatically set up when you create your first DBC migration.")
 
 	return nil
+}
+
+// InitDB initializes or recreates the Thorium databases and sets up the full DBC workflow
+func InitDB(configPath string, args []string) error {
+	fs := flag.NewFlagSet("init db", flag.ExitOnError)
+	fs.Parse(args)
+
+	fmt.Println("╔══════════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║              Initializing DBC Workflow                               ║")
+	fmt.Println("╚══════════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	// Load config
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	// Step 1: Create databases
+	fmt.Println("Step 1: Creating databases...")
+	if err := initializeDatabases(cfg); err != nil {
+		return err
+	}
+	fmt.Println("  ✓ Databases created")
+	fmt.Println()
+
+	// Step 2: Extract DBCs
+	fmt.Println("Step 2: Extracting DBCs from WoW client...")
+	if cfg.WoTLK.Path == "" || cfg.WoTLK.Path == "${WOTLK_PATH}" {
+		fmt.Println()
+		fmt.Println("  ⚠ wotlk.path not configured in config.json")
+		fmt.Println("  Please set WOTLK_PATH environment variable or edit config.json")
+		fmt.Println()
+		fmt.Println("After configuring, complete the setup:")
+		fmt.Println("  1. thorium extract --dbc")
+		fmt.Println("  2. thorium import dbc --database dbc_source")
+		fmt.Println("  3. mysqldump dbc_source | mysql dbc")
+		return fmt.Errorf("wotlk.path not configured")
+	}
+
+	extractArgs := []string{"--dbc"}
+	if err := Extract(cfg, extractArgs); err != nil {
+		return fmt.Errorf("extract DBCs: %w", err)
+	}
+	fmt.Println()
+
+	// Step 3: Import to dbc_source
+	fmt.Println("Step 3: Importing DBCs to baseline database...")
+	importArgs := []string{"dbc", "--database", "dbc_source"}
+	if err := Import(cfg, importArgs); err != nil {
+		return fmt.Errorf("import DBCs: %w", err)
+	}
+	fmt.Println()
+
+	// Step 4: Copy dbc_source to dbc
+	fmt.Println("Step 4: Copying baseline to development database...")
+	if err := copyDBCSourceToDBC(cfg); err != nil {
+		return fmt.Errorf("copy database: %w", err)
+	}
+	fmt.Println("  ✓ Copied dbc_source to dbc")
+	fmt.Println()
+
+	fmt.Println("╔══════════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║              DBC Workflow Ready!                                     ║")
+	fmt.Println("╚══════════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+	fmt.Println("You can now create DBC migrations and use thorium build")
+	fmt.Println()
+
+	return nil
+}
+
+// copyDBCSourceToDBC copies the dbc_source database to dbc using mysqldump
+func copyDBCSourceToDBC(cfg *config.Config) error {
+	srcDB := cfg.Databases.DBCSource
+	dstDB := cfg.Databases.DBC
+
+	// Build mysqldump command
+	dumpCmd := fmt.Sprintf("mysqldump -h%s -P%s -u%s", srcDB.Host, srcDB.Port, srcDB.User)
+	if srcDB.Password != "" {
+		dumpCmd += fmt.Sprintf(" -p%s", srcDB.Password)
+	}
+	dumpCmd += fmt.Sprintf(" %s", srcDB.Name)
+
+	// Build mysql import command
+	importCmd := fmt.Sprintf("mysql -h%s -P%s -u%s", dstDB.Host, dstDB.Port, dstDB.User)
+	if dstDB.Password != "" {
+		importCmd += fmt.Sprintf(" -p%s", dstDB.Password)
+	}
+	importCmd += fmt.Sprintf(" %s", dstDB.Name)
+
+	// Execute: mysqldump | mysql
+	fullCmd := fmt.Sprintf("%s | %s", dumpCmd, importCmd)
+	
+	cmd := exec.Command("sh", "-c", fullCmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("execute mysqldump: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// initializeDatabases creates DBC databases (dbc and dbc_source)
+// Note: world database is created and managed by TrinityCore
+func initializeDatabases(cfg *config.Config) error {
+	databases := []struct {
+		name   string
+		config config.DBConfig
+	}{
+		{"dbc", cfg.Databases.DBC},
+		{"dbc_source", cfg.Databases.DBCSource},
+	}
+
+	for _, db := range databases {
+		fmt.Printf("  Creating database: %s\n", db.name)
+		if err := database.CreateDatabase(db.config); err != nil {
+			return fmt.Errorf("create %s database: %w", db.name, err)
+		}
+	}
+
+	return nil
+}
+
+// checkDBCDatabasesSetup checks if DBC databases exist and have tables
+func checkDBCDatabasesSetup(cfg *config.Config) error {
+	// Check if dbc database exists and has tables
+	count, err := database.QueryValue(cfg.Databases.DBC, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '"+cfg.Databases.DBC.Name+"'")
+	if err != nil {
+		return fmt.Errorf("DBC database not configured or unreachable")
+	}
+	
+	if count == "0" {
+		return fmt.Errorf("DBC database exists but has no tables (not yet imported)")
+	}
+
+	return nil
+}
+
+// printDBCSetupInstructions prints helpful instructions for setting up DBC workflow
+func printDBCSetupInstructions() {
+	fmt.Println()
+	fmt.Println("╔══════════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║              DBC Workflow Not Yet Initialized                        ║")
+	fmt.Println("╚══════════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+	fmt.Println("Your mod has DBC migrations, but the DBC databases haven't been set up yet.")
+	fmt.Println()
+	fmt.Println("To set up the DBC workflow:")
+	fmt.Println()
+	fmt.Println("  1. Ensure config.json has correct database settings:")
+	fmt.Println("     - wotlk.path (path to your WoW 3.3.5 client)")
+	fmt.Println("     - databases.dbc (development database)")
+	fmt.Println("     - databases.dbc_source (pristine baseline)")
+	fmt.Println()
+	fmt.Println("  2. Run the setup command:")
+	fmt.Println("     thorium init db")
+	fmt.Println()
+	fmt.Println("     This will:")
+	fmt.Println("     - Create the databases")
+	fmt.Println("     - Extract DBCs from your WoW client")
+	fmt.Println("     - Import DBCs to dbc_source")
+	fmt.Println("     - Copy dbc_source to dbc")
+	fmt.Println()
+	fmt.Println("  3. Try your command again")
+	fmt.Println()
 }

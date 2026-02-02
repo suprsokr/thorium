@@ -6,27 +6,99 @@ DBC files are client-side database files used by World of Warcraft. They contain
 
 The DBC workflow in Thorium:
 
-1. **Import** - Load DBC files into a MySQL database (and save baseline copies)
-2. **Edit** - Modify data using SQL migrations in your mods
-3. **Export** - Generate new DBC files from modified tables
-4. **Build** - Package only modified DBCs into an MPQ for the client (and copy to server)
+1. **Extract** - Extract DBC files from WoW client MPQs to `shared/dbc/dbc_source/`
+2. **Import** - Load DBC files into MySQL databases (`dbc_source` and `dbc`)
+3. **Edit** - Modify data using SQL migrations in your mods (applied to `dbc`)
+4. **Export** - Generate new DBC files from modified tables in `dbc`
+5. **Build** - Package only modified DBCs into an MPQ for the client (and copy to server)
+
+## Just-In-Time Setup
+
+**You only need to set up the DBC workflow if your mod modifies DBCs.** Many mods (like those with only addons, binary edits, or assets) don't need this at all!
+
+When you create your first DBC migration and run `thorium build`, Thorium will detect that the DBC databases aren't set up yet and guide you through the process.
+
+## Setting Up DBC Workflow
+
+When you're ready to work with DBCs, it's a simple one-command setup.
+
+### Prerequisites
+
+**Important:** Make sure `config.json` has correct settings before proceeding:
+
+```json
+{
+  "wotlk": {
+    "path": "${WOTLK_PATH:-/wotlk}",
+    "locale": "enUS"
+  },
+  "databases": {
+    "dbc": {
+      "user": "trinity",
+      "password": "trinity",
+      "host": "${MYSQL_HOST:-127.0.0.1}",
+      "port": "${MYSQL_PORT:-3306}",
+      "name": "dbc"
+    },
+    "dbc_source": {
+      "user": "trinity",
+      "password": "trinity",
+      "host": "${MYSQL_HOST:-127.0.0.1}",
+      "port": "${MYSQL_PORT:-3306}",
+      "name": "dbc_source"
+    }
+  }
+}
+```
+
+**Key properties:**
+- `wotlk.path` - Path to your WoW 3.3.5 client directory (for extracting DBCs)
+- `databases.dbc` - Development database where mod migrations are applied and tested
+- `databases.dbc_source` - Pristine baseline database, never modified by migrations
+- The MySQL user must have permissions to create databases and tables
+
+### One-Command Setup
+
+```bash
+thorium init db
+```
+
+This command does everything:
+1. Creates the `dbc` and `dbc_source` databases
+2. Extracts DBCs from your WoW client to `shared/dbc/dbc_source/`
+3. Imports DBCs to the `dbc_source` database
+4. Copies `dbc_source` to `dbc` (your development database)
+
+That's it! Your DBC workflow is ready.
+
+**Note:** The `world` database is created and managed by TrinityCore, not Thorium.
+
+### Why Two Databases?
+
+The separation allows `thorium dist` to create minimal distribution packages:
+
+1. Apply your migrations to a temporary copy of `dbc_source`
+2. Export only the modified DBCs
+3. Rollback migrations to restore `dbc_source` to pristine state
+
+This ensures distributed packages only contain the DBCs you actually modified.
 
 ## Why Use a Database?
 
 Editing DBC files directly is tedious and error-prone. By importing them into MySQL:
 
-- Use familiar SQL to query and modify data
+- Use familiar SQL and tooling to query and modify data.
 - Track changes with version-controlled migration files
-- Merge changes from multiple mods automatically
 - Avoid binary file conflicts in git
+- LLMs are exceptional at navigating, modifying and scripting sql; not so for DBCs.
 
 ## Directory Structure
 
 ```
-mods/
+.
 ├── shared/
 │   └── dbc/
-│       ├── dbc_source/    # Baseline DBC files (copied during import)
+│       ├── dbc_source/    # Baseline DBC files (extracted)
 │       └── dbc_out/       # Exported modified DBC files
 └── mods/
     └── my-mod/
@@ -35,29 +107,9 @@ mods/
             └── 20250129_120000_add_custom_spell.rollback.sql
 ```
 
-## Importing DBCs
-
-Before you can edit DBCs, you need to import them into the database. Thorium supports importing from any directory containing DBC files (e.g., TrinityCore's extracted DBCs).
-
-```bash
-# Import from TrinityCore's extracted DBCs
-thorium import dbc --source /path/to/trinitycore/bin/dbc
-
-# Import from WoW client extraction
-thorium import dbc --source /path/to/extracted/DBFilesClient
-```
-
-The import command:
-1. Creates a MySQL table for each DBC file
-2. Loads all records into the table
-3. Copies source DBCs to `mods/shared/dbc/dbc_source/` as baseline
-4. Stores checksums to track modifications
-
-**Note:** Import is typically run once during initial setup. The baseline files in `dbc_source/` are used later to determine which DBCs have been modified and need to be packaged.
-
 ## Database Tables
 
-When DBCs are imported, each DBC file becomes a table in the `dbc` database. For example:
+When DBCs are imported, each DBC file becomes a table in both the `dbc_source` and `dbc` databases. For example:
 
 - `Item.dbc` → `item` table
 - `Spell.dbc` → `spell` table  
@@ -74,96 +126,30 @@ Thorium uses JSON meta files to understand DBC structure. These define:
 - String localization columns
 - Primary key fields
 
-Meta files are embedded in the Thorium binary and cover all standard 3.3.5a DBCs.
+Meta files are embedded in the Thorium binary and cover all standard 3.3.5a DBCs. Credits to [Foereaper's DBCTool](https://github.com/foereaper/dbctool) for the meta files.
 
-## Common Use Cases
+## Checksums
 
-### Adding a Custom Spell
+Thorium uses MySQL's `CHECKSUM TABLE` feature to track which DBC tables have been modified by SQL migrations. This allows efficient export of only modified tables.
 
-```sql
--- In: mods/my-mod/dbc_sql/20250129_add_fireball.sql
-INSERT INTO `spell` (`ID`, `Name_Lang_enUS`, `Description_Lang_enUS`, ...)
-VALUES (90001, 'Super Fireball', 'Launches a massive fireball', ...);
-```
+### How It Works
 
-### Modifying an Existing Item Display
+1. **During Import**: When DBCs are imported into the database, Thorium calculates and stores a baseline checksum for each table in the `dbc_checksum` table:
+   ```sql
+   CREATE TABLE dbc_checksum (
+       table_name VARCHAR(255) PRIMARY KEY,
+       checksum BIGINT UNSIGNED NOT NULL
+   );
+   ```
 
-```sql
--- In: mods/my-mod/dbc_sql/20250129_fix_sword_model.sql
-UPDATE `itemdisplayinfo` 
-SET `ModelName_0` = 'MySword.m2'
-WHERE `ID` = 12345;
-```
+2. **During Migrations**: When you apply SQL migrations that modify DBC tables (e.g., `INSERT`, `UPDATE`, `DELETE`), the table's data changes, which changes its checksum.
 
-### Adding a New Zone
+3. **During Export**: When exporting DBCs:
+   - Thorium calculates the current checksum for each table using `CHECKSUM TABLE`
+   - Compares it against the stored baseline checksum in `dbc_checksum`
+   - If checksums differ, the table has been modified and gets exported
+   - If checksums match, the table is skipped (no changes)
 
-```sql
--- In: mods/my-mod/dbc_sql/20250129_new_zone.sql
-INSERT INTO `areatable` (`ID`, `AreaName_Lang_enUS`, `MapID`, ...)
-VALUES (9001, 'Custom Valley', 0, ...);
-```
-
-### Enabling Flying in a Zone
-
-```sql
--- In: mods/my-mod/dbc_sql/20250129_enable_flying.sql
--- Add AREA_FLAG_OUTLAND (0x1000 = 4096) to enable flying
-UPDATE `areatable` 
-SET `flags` = `flags` | 4096 
-WHERE `id` = 12;  -- Elwynn Forest
-```
-
-## Exporting Modified DBCs
-
-After applying migrations, export the modified tables back to DBC files:
-
-```bash
-thorium export
-```
-
-The export command:
-1. Compares current table checksums against stored baselines
-2. Only exports tables that have been modified
-3. Writes DBC files to `mods/shared/dbc/dbc_out/`
-
-You can also run export as part of the full build pipeline with `thorium build`.
+4. **After Export**: The checksum is updated in `dbc_checksum` to reflect the new state, so subsequent exports only detect new changes.
 
 ## Building and Packaging
-
-The build command handles the full pipeline:
-
-```bash
-thorium build                    # Build all mods
-thorium build --mod my-mod       # Build specific mod only
-```
-
-During packaging, Thorium:
-1. Compares exported DBCs (`dbc_out/`) against baseline (`dbc_source/`)
-2. Only packages DBCs that actually differ
-3. Creates a patch MPQ for the client (e.g., `patch-T.MPQ`)
-4. Copies modified DBCs to the server's data folder
-
-This ensures your patch MPQ only contains the DBCs you've actually modified, keeping file sizes minimal.
-
-## Complete Example Workflow
-
-```bash
-# 1. Initialize workspace (if not already done)
-thorium init
-
-# 2. Import DBCs from TrinityCore
-thorium import dbc --source /path/to/trinitycore/bin/dbc
-
-# 3. Create a mod
-thorium create-mod flying-zones
-
-# 4. Create a migration
-thorium create-migration --mod flying-zones --db dbc "enable flying elwynn"
-
-# 5. Edit the migration SQL file to add your changes
-
-# 6. Build (applies migrations, exports, packages)
-thorium build --mod flying-zones
-
-# 7. Test in-game with the new patch MPQ
-```

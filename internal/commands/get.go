@@ -82,7 +82,7 @@ func Get(cfg *config.Config, args []string) error {
 
 	// Determine mod name (use repo name by default)
 	modName := repoName
-	
+
 	// Apply custom name override if provided
 	if *modNameOverride != "" {
 		modName = *modNameOverride
@@ -94,7 +94,7 @@ func Get(cfg *config.Config, args []string) error {
 		if !*updateExisting {
 			return fmt.Errorf("mod '%s' already exists at: %s\n\nUse --update to overwrite, or --name to install with a different name", modName, modPath)
 		}
-		
+
 		// Update mode: remove existing mod
 		fmt.Printf("Updating existing mod: %s\n", modName)
 		if err := os.RemoveAll(modPath); err != nil {
@@ -123,7 +123,7 @@ func Get(cfg *config.Config, args []string) error {
 		fmt.Printf("\n✓ Mod installed successfully!\n\n")
 	}
 	fmt.Printf("Location: %s\n", modPath)
-	
+
 	if hasReadme {
 		fmt.Printf("\nNext steps:\n")
 		fmt.Printf("  1. Review the mod documentation: mods/%s/README.md\n", modName)

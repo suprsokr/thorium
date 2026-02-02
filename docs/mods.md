@@ -10,16 +10,24 @@ Before creating mods, initialize a Thorium workspace:
 thorium init
 ```
 
-This creates:
+This creates the workspace directory structure, `config.json`, and initializes databases. See [init.md](init.md) for details.
+
+The workspace structure looks like:
+
+The workspace structure looks like:
 
 ```
-mods/
-├── config.json         # Workspace configuration
-├── shared/             # Shared resources (extracted client data)
-│   ├── dbc/            # Extracted DBC files
-│   ├── luaxml/         # Extracted interface files
+.
+├── config.json              # Workspace configuration
+├── .gitignore               # Git ignore rules
+├── shared/                  # Shared resources (extracted client data)
+│   ├── dbc/                 # DBC files
+│   │   ├── dbc_source/      # Original DBCs (extracted from client)
+│   │   └── dbc_out/         # Modified DBCs (exported from database)
+│   ├── luaxml/              # Interface files
+│   │   └── luaxml_source/   # Original LuaXML (extracted from client)
 │   └── migrations_applied/  # Tracking for applied migrations
-└── mods/               # Your mods go here
+└── mods/                    # Your mods go here
     └── .gitkeep
 ```
 
@@ -292,38 +300,72 @@ mods/mods/
 - **Use DELETE before INSERT** - Makes migrations idempotent and avoids duplicate key errors
 - **Document dependencies** - Note in your mod if it requires another mod to run first
 
-## Example Workflow
+## Example Workflows
+
+### Simple Mod (Addon Only)
 
 ```bash
-# 1. Initialize workspace (also creates CustomPackets addon)
+# 1. Initialize workspace
 thorium init
 
-# 2. Extract client data
-thorium extract
+# 2. Configure paths
+vim config.json  # or use Peacebloom
 
 # 3. Create a mod
-thorium create-mod custom-sword
+thorium create-mod my-addon
 
-# 4. Create migrations
-thorium create-migration --mod custom-sword --db dbc "add sword display"
-thorium create-migration --mod custom-sword --db world "add sword item"
+# 4. Create an addon
+thorium create-addon --mod my-addon MyAddon
 
-# 5. Create a script (optional)
-thorium create-script --mod custom-sword --type spell sword_strike
+# 5. Edit addon files in mods/my-addon/luaxml/Interface/AddOns/MyAddon/
 
-# 6. Create an addon (optional)
-thorium create-addon --mod custom-sword SwordUI
-
-# 7. Edit the generated SQL, C++, and Lua files
-
-# 8. Build everything (packages addons into MPQ)
+# 6. Build and package
 thorium build
 
-# 9. Rebuild TrinityCore (if using scripts)
+# 7. Test in-game
+
+# 8. Create distribution package
+thorium dist --mod my-addon
+```
+
+### Mod with DBC Changes
+
+```bash
+# 1. Initialize workspace
+thorium init
+
+# 2. Configure paths
+vim config.json
+
+# 3. Set up DBC workflow (only once per workspace)
+thorium init db
+thorium extract --dbc
+thorium import dbc --database dbc_source
+mysqldump dbc_source | mysql dbc
+
+# 4. Create a mod
+thorium create-mod custom-sword
+
+# 5. Create DBC migration
+thorium create-migration --mod custom-sword --db dbc "add sword display"
+
+# 6. Create World migration
+thorium create-migration --mod custom-sword --db world "add sword item"
+
+# 7. Create a script (optional)
+thorium create-script --mod custom-sword --type spell sword_strike
+
+# 8. Edit the generated SQL and C++ files
+
+# 9. Apply migrations and build
+thorium build dbc_sql world_sql  # Apply migrations only
+thorium build                     # Full build
+
+# 10. Rebuild TrinityCore (if using scripts)
 cd /path/to/TrinityCore/build && make -j$(nproc)
 
-# 10. Test in-game
+# 11. Test in-game
 
-# 11. Create distribution package
+# 12. Create distribution package
 thorium dist --mod custom-sword
 ```

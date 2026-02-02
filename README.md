@@ -61,6 +61,7 @@ Or create a new item mod from scratch:
 ```bash
 thorium init # Initialize workspace
 vim config.json # Configure paths and database connections
+thorium init db # One-time setup to enable DBC editing via SQL, see docs/dbc.md
 thorium create-mod my-custom-item
 thorium create-migration --mod my-custom-item --db dbc add_legendary_sword # Edit DBCs via SQL
 vim mods/my-custom-item/dbc_sql/*_add_legendary_sword.sql

@@ -161,3 +161,44 @@ func truncate(s string, maxLen int) string {
 	}
 	return s[:maxLen] + "..."
 }
+
+// CreateDatabase creates a database if it doesn't exist
+func CreateDatabase(dbConfig config.DBConfig) error {
+	// Connect to MySQL without a database to manage databases
+	connConfig := dbConfig
+	connConfig.Name = ""
+	
+	conn, err := connect(connConfig)
+	if err != nil {
+		return fmt.Errorf("connect to MySQL: %w", err)
+	}
+	defer conn.Close()
+
+	// Create database if it doesn't exist
+	_, err = conn.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbConfig.Name))
+	if err != nil {
+		return fmt.Errorf("create database %s: %w", dbConfig.Name, err)
+	}
+
+	return nil
+}
+
+// InitializeThoriumDatabases creates all databases required by Thorium
+func InitializeThoriumDatabases(cfg config.Config) error {
+	databases := []struct {
+		name   string
+		config config.DBConfig
+	}{
+		{"dbc", cfg.Databases.DBC},
+		{"dbc_source", cfg.Databases.DBCSource},
+		{"world", cfg.Databases.World},
+	}
+
+	for _, db := range databases {
+		if err := CreateDatabase(db.config); err != nil {
+			return fmt.Errorf("create %s database: %w", db.name, err)
+		}
+	}
+
+	return nil
+}

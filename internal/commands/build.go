@@ -24,16 +24,47 @@ import (
 func Build(cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("build", flag.ExitOnError)
 	modName := fs.String("mod", "", "Build specific mod only")
-	skipMigrations := fs.Bool("skip-migrations", false, "Skip SQL migrations")
-	skipExport := fs.Bool("skip-export", false, "Skip DBC export")
+	skipDBCSQL := fs.Bool("skip-dbc-sql", false, "Skip DBC SQL migrations")
+	skipWorldSQL := fs.Bool("skip-world-sql", false, "Skip World SQL migrations")
+	skipBinaryEdits := fs.Bool("skip-binary-edits", false, "Skip binary edits")
+	skipServerPatches := fs.Bool("skip-server-patches", false, "Skip server patches")
+	skipAssets := fs.Bool("skip-assets", false, "Skip copying assets")
+	skipExportDBC := fs.Bool("skip-export-dbc", false, "Skip DBC export")
+	skipLuaXML := fs.Bool("skip-luaxml", false, "Skip LuaXML processing")
+	skipScripts := fs.Bool("skip-scripts", false, "Skip script deployment")
 	skipPackage := fs.Bool("skip-package", false, "Skip MPQ packaging")
-	skipServer := fs.Bool("skip-server", false, "Skip copying to server")
-	force := fs.Bool("force", false, "Force reapply all tracked items (binary-edits, server-patches, assets, scripts)")
+	skipServerDBC := fs.Bool("skip-server-dbc", false, "Skip copying DBCs to server")
+	force := fs.Bool("force", false, "Force reapply all tracked items (migrations, binary-edits, server-patches, assets, scripts)")
+	forceDBCSQL := fs.Bool("force-dbc-sql", false, "Force reapply DBC SQL migrations even if already applied")
+	forceWorldSQL := fs.Bool("force-world-sql", false, "Force reapply World SQL migrations even if already applied")
 	forceBinaryEdits := fs.Bool("force-binary-edits", false, "Force reapply binary edits even if already applied")
 	forceServerPatches := fs.Bool("force-server-patches", false, "Force reapply server patches even if already applied")
 	forceAssets := fs.Bool("force-assets", false, "Force recopy assets even if unchanged")
 	forceScripts := fs.Bool("force-scripts", false, "Force redeploy scripts even if unchanged")
 	fs.Parse(args)
+
+	// Parse positional arguments for component selection
+	components := fs.Args()
+	validComponents := map[string]bool{
+		"dbc":          true,
+		"dbc_sql":      true,
+		"world_sql":    true,
+		"binary":       true,
+		"server-patches": true,
+		"assets":       true,
+		"luaxml":       true,
+		"scripts":      true,
+	}
+	
+	componentSet := make(map[string]bool)
+	for _, comp := range components {
+		compLower := strings.ToLower(comp)
+		if !validComponents[compLower] {
+			return fmt.Errorf("unknown component: %s\nValid components: dbc, dbc_sql, world_sql, binary, server-patches, assets, luaxml, scripts", comp)
+		}
+		componentSet[compLower] = true
+	}
+	buildAll := len(componentSet) == 0
 
 	fmt.Println("╔══════════════════════════════════════════╗")
 	fmt.Println("║        Thorium Build System              ║")
@@ -68,29 +99,71 @@ func Build(cfg *config.Config, args []string) error {
 
 	fmt.Printf("Building %d mod(s): %v\n\n", len(mods), mods)
 
+	// Determine which components to build
+	// Note: "dbc" implies DBC SQL migrations, export, and packaging
+	buildDBCSQL := buildAll || componentSet["dbc"] || componentSet["dbc_sql"]
+	buildWorldSQL := buildAll || componentSet["world_sql"]
+	buildBinary := buildAll || componentSet["binary"]
+	buildServerPatches := buildAll || componentSet["server-patches"]
+	buildAssets := buildAll || componentSet["assets"]
+	buildDBCExport := buildAll || componentSet["dbc"]
+	buildLuaXML := buildAll || componentSet["luaxml"]
+	buildScripts := buildAll || componentSet["scripts"]
+	buildPackage := buildAll || componentSet["dbc"] || componentSet["luaxml"]
+
+	if !buildAll {
+		fmt.Printf("Building components: %v\n\n", components)
+	}
+
 	// Step 1: Apply SQL migrations
-	if !*skipMigrations {
+	shouldRunDBCMigrations := buildDBCSQL && !*skipDBCSQL
+	shouldRunWorldMigrations := buildWorldSQL && !*skipWorldSQL
+	
+	if shouldRunDBCMigrations || shouldRunWorldMigrations {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 1: Applying SQL Migrations         │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
 		migrationsFound := false
+		dbcMigrationsFound := false
+		
 		for _, mod := range mods {
 			// Check if mod has any migration directories with files
-			dbcDir := filepath.Join(cfg.GetModsPath(), mod, "dbc_sql")
-			worldDir := filepath.Join(cfg.GetModsPath(), mod, "world_sql")
-			if entries, _ := os.ReadDir(dbcDir); len(entries) > 0 {
-				migrationsFound = true
+			if shouldRunDBCMigrations {
+				dbcDir := filepath.Join(cfg.GetModsPath(), mod, "dbc_sql")
+				if entries, _ := os.ReadDir(dbcDir); len(entries) > 0 {
+					migrationsFound = true
+					dbcMigrationsFound = true
+				}
 			}
-			if entries, _ := os.ReadDir(worldDir); len(entries) > 0 {
-				migrationsFound = true
+			if shouldRunWorldMigrations {
+				worldDir := filepath.Join(cfg.GetModsPath(), mod, "world_sql")
+				if entries, _ := os.ReadDir(worldDir); len(entries) > 0 {
+					migrationsFound = true
+				}
 			}
-
-			if err := applyMigrations(cfg, mod, "dbc"); err != nil {
-				return fmt.Errorf("apply dbc migrations for %s: %w", mod, err)
+		}
+		
+		// Check DBC setup only if we have DBC migrations
+		if dbcMigrationsFound {
+			if err := checkDBCDatabasesSetup(cfg); err != nil {
+				printDBCSetupInstructions()
+				return fmt.Errorf("DBC databases not initialized")
 			}
-			if err := applyMigrations(cfg, mod, "world"); err != nil {
-				return fmt.Errorf("apply world migrations for %s: %w", mod, err)
+		}
+		
+		for _, mod := range mods {
+			if shouldRunDBCMigrations {
+				forceDBC := *force || *forceDBCSQL
+				if err := applyMigrationsWithForce(cfg, mod, "dbc", forceDBC); err != nil {
+					return fmt.Errorf("apply dbc migrations for %s: %w", mod, err)
+				}
+			}
+			if shouldRunWorldMigrations {
+				forceWorld := *force || *forceWorldSQL
+				if err := applyMigrationsWithForce(cfg, mod, "world", forceWorld); err != nil {
+					return fmt.Errorf("apply world migrations for %s: %w", mod, err)
+				}
 			}
 		}
 		if !migrationsFound {
@@ -100,7 +173,7 @@ func Build(cfg *config.Config, args []string) error {
 	}
 
 	// Step 2: Apply binary edits to client
-	if cfg.WoTLK.Path != "" {
+	if buildBinary && !*skipBinaryEdits && cfg.WoTLK.Path != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 2: Applying Binary Edits           │")
 		fmt.Println("└──────────────────────────────────────────┘")
@@ -118,7 +191,7 @@ func Build(cfg *config.Config, args []string) error {
 	}
 
 	// Step 3: Apply server patches from mods
-	if cfg.TrinityCore.SourcePath != "" {
+	if buildServerPatches && !*skipServerPatches && cfg.TrinityCore.SourcePath != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 3: Applying Server Patches         │")
 		fmt.Println("└──────────────────────────────────────────┘")
@@ -137,7 +210,7 @@ func Build(cfg *config.Config, args []string) error {
 	}
 
 	// Step 4: Copy mod assets to client
-	if cfg.WoTLK.Path != "" {
+	if buildAssets && !*skipAssets && cfg.WoTLK.Path != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 4: Copying Mod Assets              │")
 		fmt.Println("└──────────────────────────────────────────┘")
@@ -155,7 +228,7 @@ func Build(cfg *config.Config, args []string) error {
 	}
 
 	// Step 5: Export modified DBCs
-	if !*skipExport {
+	if buildDBCExport && !*skipExportDBC {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 5: Exporting Modified DBCs         │")
 		fmt.Println("└──────────────────────────────────────────┘")
@@ -174,36 +247,38 @@ func Build(cfg *config.Config, args []string) error {
 	}
 
 	// Step 6: Check for LuaXML modifications
-	fmt.Println("┌──────────────────────────────────────────┐")
-	fmt.Println("│  Step 6: Checking LuaXML Modifications   │")
-	fmt.Println("└──────────────────────────────────────────┘")
-
-	// Collect modified LuaXML files from all mods
 	var allModifiedLuaXML []mpq.ModifiedLuaXMLFile
-	for _, mod := range mods {
+	if buildLuaXML && !*skipLuaXML {
+		fmt.Println("┌──────────────────────────────────────────┐")
+		fmt.Println("│  Step 6: Checking LuaXML Modifications   │")
+		fmt.Println("└──────────────────────────────────────────┘")
+
+		// Collect modified LuaXML files from all mods
+		for _, mod := range mods {
 		modFiles, err := findModifiedLuaXMLInMod(cfg, mod)
 		if err != nil {
 			return fmt.Errorf("check luaxml for %s: %w", mod, err)
 		}
-		if len(modFiles) > 0 {
-			fmt.Printf("[%s] Found %d modified LuaXML file(s)\n", mod, len(modFiles))
-			// Convert to mpq type
-			for _, f := range modFiles {
-				allModifiedLuaXML = append(allModifiedLuaXML, mpq.ModifiedLuaXMLFile{
-					ModName:  f.ModName,
-					FilePath: f.FilePath,
-					RelPath:  f.RelPath,
-				})
+			if len(modFiles) > 0 {
+				fmt.Printf("[%s] Found %d modified LuaXML file(s)\n", mod, len(modFiles))
+				// Convert to mpq type
+				for _, f := range modFiles {
+					allModifiedLuaXML = append(allModifiedLuaXML, mpq.ModifiedLuaXMLFile{
+						ModName:  f.ModName,
+						FilePath: f.FilePath,
+						RelPath:  f.RelPath,
+					})
+				}
 			}
 		}
+		if len(allModifiedLuaXML) == 0 {
+			fmt.Println("  No LuaXML modifications found in mods")
+		}
+		fmt.Println()
 	}
-	if len(allModifiedLuaXML) == 0 {
-		fmt.Println("  No LuaXML modifications found in mods")
-	}
-	fmt.Println()
 
 	// Step 7: Deploy Scripts to TrinityCore
-	if cfg.TrinityCore.ScriptsPath != "" {
+	if buildScripts && !*skipScripts && cfg.TrinityCore.ScriptsPath != "" {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 7: Deploying Scripts               │")
 		fmt.Println("└──────────────────────────────────────────┘")
@@ -216,15 +291,15 @@ func Build(cfg *config.Config, args []string) error {
 
 	// Step 8: Package and distribute
 	var dbcCount, luaxmlCount int
-	if !*skipPackage {
+	if buildPackage && !*skipPackage {
 		fmt.Println("┌──────────────────────────────────────────┐")
 		fmt.Println("│  Step 8: Packaging and Distributing      │")
 		fmt.Println("└──────────────────────────────────────────┘")
 
 		builder := mpq.NewBuilder(cfg)
 
-		// Copy to server
-		if !*skipServer && cfg.Server.DBCPath != "" {
+		// Copy to server (only if building DBCs)
+		if buildDBCExport && !*skipServerDBC && cfg.Server.DBCPath != "" {
 			count, err := builder.CopyToServer()
 			if err != nil {
 				return fmt.Errorf("copy to server: %w", err)
@@ -234,15 +309,17 @@ func Build(cfg *config.Config, args []string) error {
 			}
 		}
 
-		// Package DBC MPQ
-		count, err := builder.PackageDBCs()
-		if err != nil {
-			return fmt.Errorf("package DBCs: %w", err)
+		// Package DBC MPQ (only if building DBCs)
+		if buildDBCExport {
+			count, err := builder.PackageDBCs()
+			if err != nil {
+				return fmt.Errorf("package DBCs: %w", err)
+			}
+			dbcCount = count
 		}
-		dbcCount = count
 
-		// Package LuaXML MPQ from modified files
-		if len(allModifiedLuaXML) > 0 {
+		// Package LuaXML MPQ from modified files (only if building LuaXML)
+		if buildLuaXML && len(allModifiedLuaXML) > 0 {
 			count, err := builder.PackageLuaXMLFromMods(allModifiedLuaXML)
 			if err != nil {
 				return fmt.Errorf("package LuaXML: %w", err)

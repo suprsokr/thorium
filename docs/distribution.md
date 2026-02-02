@@ -2,7 +2,7 @@
 
 The `dist` command creates a player-ready distribution package containing client files (MPQs and optionally wow.exe). This is what you distribute to players who want to play on your modded server.
 
-For mod source distribution (for other modders), host your mod on GitHub and use the upcoming `thorium get-mod <github-repo>` command.
+For mod source distribution (for other modders), host your mod on GitHub and use the `thorium get-mod <github-repo>` command.
 
 ## Usage
 
@@ -76,9 +76,10 @@ Launch WoW and connect to your server. The client will load the custom MPQ files
 | wow.exe | From WoTLK path in config.json | Root folder | Automatically included if binary edits were applied |
 
 **Notes:**
-- DBC SQL migrations are applied to the DBC database and exported to DBC files, which are then packaged into the client MPQ. The SQL files themselves are not distributed since the client needs the compiled DBC format.
+- DBC SQL migrations are temporarily applied to the `dbc_source` database, exported to DBC files, then rolled back to keep `dbc_source` pristine. This ensures only modified DBCs are included in the distribution. See [DBC Workflow](dbc.md#why-two-databases) for details.
 - MPQ files are built by `thorium build` and stored at the paths specified in `config.json` (`output.dbc_mpq` and `output.luaxml_mpq`).
 - `wow.exe` is automatically detected and included by checking `mods/shared/binary_edits_applied.json` for any applied binary edits. Use `--no-exe` to skip this.
+- The SQL migration files themselves are not distributed since the client needs the compiled DBC format.
 
 ## Typical Workflow
 
@@ -95,6 +96,8 @@ thorium dist --output ./releases/v1.0.0.zip
 
 # 4. Share the zip with players (upload to website, Discord, etc.)
 ```
+
+**How DBCs are packaged:** The `dist` command temporarily applies your mod's DBC migrations to the `dbc_source` database, exports only the modified DBCs, then rolls back the migrations to restore `dbc_source` to its pristine state. This ensures the distribution package only contains DBCs that were actually modified by your mod. See [DBC Workflow](dbc.md#why-two-databases) for more details.
 
 ## Mod Source Distribution (for modders)
 

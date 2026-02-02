@@ -32,9 +32,6 @@ type Config struct {
 	// TrinityCore source
 	TrinityCore TrinityConfig `json:"trinitycore"`
 
-	// Extensions
-	Extensions ExtensionsConfig `json:"extensions"`
-
 	// Output settings
 	Output OutputConfig `json:"output"`
 }
@@ -47,8 +44,9 @@ type WoTLKConfig struct {
 
 // DatabasesConfig holds database connection settings
 type DatabasesConfig struct {
-	DBC   DBConfig `json:"dbc"`
-	World DBConfig `json:"world"`
+	DBC       DBConfig `json:"dbc"`
+	DBCSource DBConfig `json:"dbc_source"`
+	World     DBConfig `json:"world"`
 }
 
 // DBConfig holds connection info for a single database
@@ -69,16 +67,6 @@ type ServerConfig struct {
 type TrinityConfig struct {
 	SourcePath  string `json:"source_path"`  // Path to TrinityCore source root
 	ScriptsPath string `json:"scripts_path"` // Path to Custom scripts folder
-}
-
-// ExtensionsConfig holds optional extension settings
-type ExtensionsConfig struct {
-	CustomPackets CustomPacketsConfig `json:"custom_packets"`
-}
-
-// CustomPacketsConfig holds custom packets extension settings
-type CustomPacketsConfig struct {
-	Enabled bool `json:"enabled"` // Whether to enable custom packets support
 }
 
 // OutputConfig holds output file settings
@@ -204,6 +192,22 @@ func (c *Config) applyDefaults() {
 		c.Databases.DBC.Password = "trinity"
 	}
 
+	if c.Databases.DBCSource.Host == "" {
+		c.Databases.DBCSource.Host = getEnvOrDefault("MYSQL_HOST", "127.0.0.1")
+	}
+	if c.Databases.DBCSource.Port == "" {
+		c.Databases.DBCSource.Port = getEnvOrDefault("MYSQL_PORT", "3306")
+	}
+	if c.Databases.DBCSource.Name == "" {
+		c.Databases.DBCSource.Name = "dbc_source"
+	}
+	if c.Databases.DBCSource.User == "" {
+		c.Databases.DBCSource.User = "trinity"
+	}
+	if c.Databases.DBCSource.Password == "" {
+		c.Databases.DBCSource.Password = "trinity"
+	}
+
 	if c.Databases.World.Host == "" {
 		c.Databases.World.Host = getEnvOrDefault("MYSQL_HOST", "127.0.0.1")
 	}
@@ -318,6 +322,13 @@ func DefaultConfig() *Config {
 				Port:     "${MYSQL_PORT:-3306}",
 				Name:     "dbc",
 			},
+			DBCSource: DBConfig{
+				User:     "trinity",
+				Password: "trinity",
+				Host:     "${MYSQL_HOST:-127.0.0.1}",
+				Port:     "${MYSQL_PORT:-3306}",
+				Name:     "dbc_source",
+			},
 			World: DBConfig{
 				User:     "trinity",
 				Password: "trinity",
@@ -332,11 +343,6 @@ func DefaultConfig() *Config {
 		TrinityCore: TrinityConfig{
 			SourcePath:  "${TC_SOURCE_PATH:-/home/peacebloom/TrinityCore}",
 			ScriptsPath: "${TC_SOURCE_PATH:-/home/peacebloom/TrinityCore}/src/server/scripts/Custom",
-		},
-		Extensions: ExtensionsConfig{
-			CustomPackets: CustomPacketsConfig{
-				Enabled: false,
-			},
 		},
 		Output: OutputConfig{
 			DBCMPQ:    "patch-T.MPQ",

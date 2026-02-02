@@ -18,14 +18,19 @@ type Exporter struct {
 
 // NewExporter creates a new DBC exporter
 func NewExporter(cfg *appconfig.Config) *Exporter {
+	return NewExporterWithDB(cfg, cfg.Databases.DBC)
+}
+
+// NewExporterWithDB creates a new DBC exporter with a custom database config
+func NewExporterWithDB(cfg *appconfig.Config, dbConfig appconfig.DBConfig) *Exporter {
 	// Create DBC tool config from thorium config
 	dbcCfg := &Config{
 		DBC: DBConfig{
-			User:     cfg.Databases.DBC.User,
-			Password: cfg.Databases.DBC.Password,
-			Host:     cfg.Databases.DBC.Host,
-			Port:     cfg.Databases.DBC.Port,
-			Name:     cfg.Databases.DBC.Name,
+			User:     dbConfig.User,
+			Password: dbConfig.Password,
+			Host:     dbConfig.Host,
+			Port:     dbConfig.Port,
+			Name:     dbConfig.Name,
 		},
 		Paths: PathConfig{
 			Base:   cfg.GetDBCSourcePath(),

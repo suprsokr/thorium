@@ -91,7 +91,9 @@ After installation, initialize a workspace:
 thorium init
 ```
 
-This creates a `config.json` file. Edit it to configure your paths and database connections:
+This creates the workspace directory structure and a `config.json` file. See [init.md](init.md) for detailed information on initialization.
+
+Edit `config.json` to configure your paths and database connections, or use [Peacebloom](https://github.com/suprsokr/peacebloom) to manage your environment with Docker:
 
 ```json
 {
@@ -122,24 +124,6 @@ This creates a `config.json` file. Edit it to configure your paths and database 
 
 ### Configuration Options
 
-- **wotlk.path**: Path to your WoW 3.3.5 client directory. Can use `${WOTLK_PATH}` environment variable.
-- **wotlk.locale**: Client locale (e.g., `enUS`, `enGB`, `deDE`).
-- **databases.dbc**: Connection settings for the DBC database (where DBC data is stored as SQL tables).
-- **databases.world**: Connection settings for your TrinityCore world database.
-- **server.dbc_path**: Path where TrinityCore expects DBC files. Can use `${TC_SERVER_PATH}` environment variable.
+See [Configuration](config.md) for complete documentation of all `config.json` parameters.
 
-Environment variables like `${WOTLK_PATH}` and `${TC_SERVER_PATH}` are automatically expanded.
-
-### Setting Up the DBC Database
-
-Before using Thorium, you need to create and populate the DBC database:
-
-```bash
-# Extract DBCs from your WoW client
-thorium extract --dbc
-
-# Import DBCs into the database
-# (This step may vary depending on your setup)
-```
-
-The DBC database stores all client data files (items, spells, NPCs, etc.) as SQL tables, allowing you to edit them with SQL migrations.
+Environment variables like `${WOTLK_PATH}` and `${TC_SERVER_PATH}` are automatically expanded. See [DBC Workflow](dbc.md#just-in-time-setup) for when and how to set up DBC databases.

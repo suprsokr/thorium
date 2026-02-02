@@ -196,15 +196,15 @@ func printModSummary(mod RegistryMod) {
 	fmt.Printf("│  Name: %s\n", mod.Name)
 	fmt.Printf("│  Author: %s\n", mod.Author)
 	fmt.Printf("│  %s\n", mod.Description)
-	
+
 	if len(mod.Tags) > 0 {
 		fmt.Printf("│  Tags: %s\n", strings.Join(mod.Tags, ", "))
 	}
-	
+
 	if len(mod.Requires) > 0 {
 		fmt.Printf("│  Requires: %s\n", strings.Join(mod.Requires, ", "))
 	}
-	
+
 	fmt.Printf("│  Repository: %s\n", mod.Repository)
 	fmt.Printf("└─\n\n")
 }
@@ -235,10 +235,10 @@ func showModDetails(registry *Registry, name string) error {
 	fmt.Printf("║ Name:        %s\n", found.Name)
 	fmt.Printf("║ Version:     %s\n", found.Version)
 	fmt.Printf("║ Author:      %s\n", found.Author)
-	
+
 	fmt.Printf("║\n")
 	fmt.Printf("║ Description:\n")
-	
+
 	// Word wrap description
 	words := strings.Fields(found.Description)
 	line := "║   "
@@ -257,31 +257,31 @@ func showModDetails(registry *Registry, name string) error {
 	if line != "║   " {
 		fmt.Println(line)
 	}
-	
+
 	fmt.Printf("║\n")
 	fmt.Printf("║ Repository:  %s\n", found.Repository)
-	
+
 	fmt.Printf("║\n")
-	
+
 	if len(found.Tags) > 0 {
 		fmt.Printf("║ Tags:        %s\n", strings.Join(found.Tags, ", "))
 	}
-	
+
 	if len(found.Requires) > 0 {
 		fmt.Printf("║ Requires:    %s\n", strings.Join(found.Requires, ", "))
 		fmt.Printf("║              (install dependencies first)\n")
 	}
-	
+
 	fmt.Printf("║\n")
 	fmt.Printf("║ Added:       %s\n", found.AddedDate.Format("2006-01-02"))
 	fmt.Printf("║ Updated:     %s\n", found.UpdatedDate.Format("2006-01-02"))
-	
+
 	fmt.Printf("║\n")
 	fmt.Printf("╚═══════════════════════════════════════════════════════════════\n\n")
-	
+
 	fmt.Printf("To install this mod:\n")
 	fmt.Printf("  thorium get %s\n\n", found.Repository)
-	
+
 	if len(found.Requires) > 0 {
 		fmt.Printf("Note: This mod requires the following dependencies:\n")
 		for _, dep := range found.Requires {
@@ -296,46 +296,46 @@ func showModDetails(registry *Registry, name string) error {
 // listAllTags lists all unique tags used in the registry
 func listAllTags(registry *Registry) error {
 	tagCount := make(map[string]int)
-	
+
 	for _, mod := range registry.Mods {
 		for _, tag := range mod.Tags {
 			tagCount[strings.ToLower(tag)]++
 		}
 	}
-	
+
 	if len(tagCount) == 0 {
 		fmt.Println("No tags found in registry.")
 		return nil
 	}
-	
+
 	// Sort tags alphabetically
 	tags := make([]string, 0, len(tagCount))
 	for tag := range tagCount {
 		tags = append(tags, tag)
 	}
 	sort.Strings(tags)
-	
+
 	fmt.Printf("Available tags (%d total):\n\n", len(tags))
-	
+
 	// Group tags by category (simple heuristic based on common patterns)
 	categories := map[string][]string{
-		"Features":   {},
-		"Content":    {},
-		"Technical":  {},
-		"Gameplay":   {},
-		"Scope":      {},
+		"Features":      {},
+		"Content":       {},
+		"Technical":     {},
+		"Gameplay":      {},
+		"Scope":         {},
 		"Uncategorized": {},
 	}
-	
+
 	featureTags := []string{"scripting", "database", "ui", "graphics", "audio", "networking", "api"}
 	contentTags := []string{"quests", "items", "spells", "npcs", "zones", "dungeons", "raids", "pvp", "professions"}
 	technicalTags := []string{"lua-api", "client-server", "client-only", "server-only", "binary-patch", "core-patch"}
 	gameplayTags := []string{"balance", "quality-of-life", "convenience", "hardcore", "custom-class", "custom-race"}
 	scopeTags := []string{"framework", "library", "content-pack", "patch"}
-	
+
 	for _, tag := range tags {
 		categorized := false
-		
+
 		for _, ft := range featureTags {
 			if strings.Contains(tag, ft) {
 				categories["Features"] = append(categories["Features"], fmt.Sprintf("%s (%d)", tag, tagCount[tag]))
@@ -343,7 +343,7 @@ func listAllTags(registry *Registry) error {
 				break
 			}
 		}
-		
+
 		if !categorized {
 			for _, ct := range contentTags {
 				if strings.Contains(tag, ct) {
@@ -353,7 +353,7 @@ func listAllTags(registry *Registry) error {
 				}
 			}
 		}
-		
+
 		if !categorized {
 			for _, tt := range technicalTags {
 				if strings.Contains(tag, tt) {
@@ -363,7 +363,7 @@ func listAllTags(registry *Registry) error {
 				}
 			}
 		}
-		
+
 		if !categorized {
 			for _, gt := range gameplayTags {
 				if strings.Contains(tag, gt) {
@@ -373,7 +373,7 @@ func listAllTags(registry *Registry) error {
 				}
 			}
 		}
-		
+
 		if !categorized {
 			for _, st := range scopeTags {
 				if strings.Contains(tag, st) {
@@ -383,12 +383,12 @@ func listAllTags(registry *Registry) error {
 				}
 			}
 		}
-		
+
 		if !categorized {
 			categories["Uncategorized"] = append(categories["Uncategorized"], fmt.Sprintf("%s (%d)", tag, tagCount[tag]))
 		}
 	}
-	
+
 	// Print categories
 	categoryOrder := []string{"Features", "Content", "Technical", "Gameplay", "Scope", "Uncategorized"}
 	for _, category := range categoryOrder {
@@ -400,11 +400,11 @@ func listAllTags(registry *Registry) error {
 			fmt.Println()
 		}
 	}
-	
+
 	fmt.Printf("Search by tag: thorium search --tag <tag-name>\n")
 	fmt.Printf("Example:       thorium search --tag networking\n")
 	fmt.Printf("Multiple tags: thorium search --tag networking --tag framework\n")
-	
+
 	return nil
 }
 

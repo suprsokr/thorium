@@ -11,6 +11,21 @@ Each mod can contain migrations for:
 
 Migrations are timestamped and applied in order. Each migration has a rollback counterpart.
 
+## DBC Migrations
+
+DBC migrations are applied to the `dbc` database, then exported to DBC files during `thorium build`, which packages them into client MPQs. See [DBC Workflow](dbc.md) for complete details on setting up and working with DBC migrations.
+
+## World Migrations
+
+World migrations modify server-side data in your TrinityCore world database. These migrations:
+
+- **Use existing database** - Work with your TrinityCore `world` database (no special setup needed)
+- **Modify server data** - Changes affect server behavior (NPCs, quests, loot, item stats, etc.)
+- **Applied directly** - SQL runs directly against the world database
+- **No export needed** - Changes are in the database, no file generation required
+
+**Workflow:** World migrations are applied directly to your world database and take effect immediately after applying.
+
 ## Directory Structure
 
 ```
@@ -70,19 +85,23 @@ DELETE FROM `spell` WHERE `ID` = 90001;
 
 ## Applying Migrations
 
+Use `thorium build` with component selection to apply migrations:
+
 ```bash
 # Apply all pending migrations for all mods
-thorium apply
+thorium build dbc_sql world_sql
 
 # Apply migrations for a specific mod
-thorium apply --mod my-mod
+thorium build --mod my-mod dbc_sql world_sql
 
 # Apply only DBC migrations
-thorium apply --db dbc
+thorium build dbc_sql
 
 # Apply only World migrations
-thorium apply --db world
+thorium build world_sql
 ```
+
+**Note:** The `build` command applies migrations as part of its pipeline. Use component selection (`dbc_sql`, `world_sql`) to run only the migration steps without building other components.
 
 ## Rolling Back
 

@@ -85,8 +85,6 @@ func main() {
 	switch cmd {
 	case "build":
 		cmdErr = commands.Build(cfg, subArgs)
-	case "apply":
-		cmdErr = commands.Apply(cfg, subArgs)
 	case "rollback":
 		cmdErr = commands.Rollback(cfg, subArgs)
 	case "export":
@@ -124,7 +122,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`Thorium - TrinityCore Modding Framework
+	fmt.Println(`Thorium - Unified Workflow for WoW server and client mods.
 
 Usage: thorium [global-flags] <command> [command-flags]
 
@@ -132,23 +130,22 @@ Global Flags:
   --config <path>    Path to config.json (default: ./config.json)
 
 Commands:
-  init               Initialize a new Thorium workspace
-  search [query]     Search the mod registry for available mods
-  get <url>          Install a mod from a GitHub repository
-  create-mod <name>  Create a new mod with standard structure
-  create-migration   Create a new SQL migration in a mod
-  create-script      Create a new TrinityCore script in a mod
-  create-addon       Create a new WoW addon in a mod's luaxml folder
   build              Full build: migrations, patches, DBCs, scripts, assets, MPQs
-  apply              Apply SQL migrations for mods
-  rollback           Rollback SQL migrations
+  create-addon       Create a new WoW addon in a mod's luaxml folder
+  create-migration   Create a new SQL migration in a mod
+  create-mod <name>  Create a new mod with standard structure
+  create-script      Create a new TrinityCore script in a mod
+  dist               Create player distribution zip (client MPQs + exe)
   export             Export modified DBCs from database
   extract            Extract DBC/LuaXML from client MPQs
+  get <url>          Install a mod from a GitHub repository
+  help               Show this help message
   import             Import DBC files into database
-  dist               Create player distribution zip (client MPQs + exe)
+  init               Initialize a new Thorium workspace
+  rollback           Rollback SQL migrations
+  search [query]     Search the mod registry for available mods
   status             Show status of migrations and mods
   version            Show version information
-  help               Show this help message
 
 Mod Structure:
   mods/<mod>/dbc_sql/         SQL migrations for DBC database
@@ -158,11 +155,5 @@ Mod Structure:
   mods/<mod>/binary-edits/    Client binary patches (.json files)
   mods/<mod>/assets/          Files to copy to client (with config.json)
   mods/<mod>/luaxml/          Client-side Lua/XML modifications
-
-Environment Variables:
-  WOTLK_PATH           Path to WoW 3.3.5 client directory
-  TC_SOURCE_PATH       Path to TrinityCore source directory
-  TC_SERVER_PATH       Path to TrinityCore server directory
-  MYSQL_HOST           MySQL host (default: 127.0.0.1)
-  MYSQL_PORT           MySQL port (default: 3306)`)
+  shared/                     Shared resources (extracted client data, migration tracking, applied patches)`)
 }

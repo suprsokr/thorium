@@ -1,6 +1,6 @@
 # Thorium Get - Installing Mods from GitHub
 
-The `thorium get` command allows you to easily install Thorium mods from GitHub repositories into your workspace.
+The `thorium get` command allows you to easily install Thorium mods from GitHub repositories into your Thorium workspace.
 
 ## Usage
 
@@ -103,25 +103,6 @@ If a mod with the same name already exists, the command will fail with an error:
 Error: mod 'thorium-custom-packets' already exists at: mods/thorium-custom-packets
 
 Use --update to overwrite, or --name to install with a different name
-```
-
-You have three options:
-
-1. **Update the existing mod:**
-   ```bash
-   thorium get https://github.com/suprsokr/thorium-custom-packets --update
-   ```
-
-2. **Install with a different name:**
-   ```bash
-   thorium get https://github.com/suprsokr/thorium-custom-packets --name custom-packets-v2
-   ```
-
-3. **Manually remove and reinstall:**
-   ```bash
-   rm -rf mods/thorium-custom-packets
-   thorium get https://github.com/suprsokr/thorium-custom-packets
-   ```
 
 ### Not in a Thorium workspace
 
@@ -154,21 +135,6 @@ To make your mod installable via `thorium get`:
 1. Create a GitHub repository
 2. Push your mod directory contents to the repository root
 3. Share the repository URL with users
-
-Example repository structure:
-
-```
-your-repo/
-├── README.md
-├── scripts/
-│   └── my_script.cpp
-├── server-patches/
-│   └── my-patch.patch
-├── luaxml/
-│   └── Interface/AddOns/...
-└── assets/
-    └── config.json
-```
 
 Users can then install it with:
 

@@ -15,60 +15,6 @@ import (
 	"thorium-cli/internal/database"
 )
 
-// Apply applies SQL migrations for mods
-func Apply(cfg *config.Config, args []string) error {
-	fs := flag.NewFlagSet("apply", flag.ExitOnError)
-	modName := fs.String("mod", "", "Apply migrations for specific mod only")
-	dbType := fs.String("db", "", "Apply only 'dbc' or 'world' migrations")
-	fs.Parse(args)
-
-	fmt.Println("=== Applying SQL Migrations ===")
-	fmt.Println()
-
-	// Get list of mods
-	mods, err := listMods(cfg)
-	if err != nil {
-		return fmt.Errorf("list mods: %w", err)
-	}
-
-	// Filter to specific mod if requested
-	if *modName != "" {
-		found := false
-		for _, m := range mods {
-			if m == *modName {
-				mods = []string{m}
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("mod not found: %s", *modName)
-		}
-	}
-
-	if len(mods) == 0 {
-		fmt.Println("No mods found.")
-		return nil
-	}
-
-	// Process each mod
-	for _, mod := range mods {
-		if *dbType == "" || *dbType == "dbc" {
-			if err := applyMigrations(cfg, mod, "dbc"); err != nil {
-				return err
-			}
-		}
-		if *dbType == "" || *dbType == "world" {
-			if err := applyMigrations(cfg, mod, "world"); err != nil {
-				return err
-			}
-		}
-	}
-
-	fmt.Println("\n=== Migrations Complete ===")
-	return nil
-}
-
 // Rollback rolls back SQL migrations for mods
 func Rollback(cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("rollback", flag.ExitOnError)
@@ -122,6 +68,18 @@ func Rollback(cfg *config.Config, args []string) error {
 
 // applyMigrations applies migrations for a single mod and db type
 func applyMigrations(cfg *config.Config, mod, dbType string) error {
+	return applyMigrationsToDatabase(cfg, mod, dbType, nil, false)
+}
+
+// applyMigrationsWithForce applies migrations for a single mod and db type with force flag
+func applyMigrationsWithForce(cfg *config.Config, mod, dbType string, force bool) error {
+	return applyMigrationsToDatabase(cfg, mod, dbType, nil, force)
+}
+
+// applyMigrationsToDatabase applies migrations for a single mod and db type to a specific database
+// If dbConfig is nil, uses the default database from config
+// If force is true, reapplies migrations even if they're already applied
+func applyMigrationsToDatabase(cfg *config.Config, mod, dbType string, dbConfig *config.DBConfig, force bool) error {
 	migrationDir := filepath.Join(cfg.GetModsPath(), mod, dbType+"_sql")
 	appliedDir := filepath.Join(cfg.GetAppliedMigrationsPath(), mod, dbType)
 
@@ -134,6 +92,14 @@ func applyMigrations(cfg *config.Config, mod, dbType string) error {
 		return nil
 	}
 
+	// Check if DBC databases are set up (only for dbc migrations)
+	if dbType == "dbc" && dbConfig == nil {
+		if err := checkDBCDatabasesSetup(cfg); err != nil {
+			printDBCSetupInstructions()
+			return fmt.Errorf("DBC databases not initialized")
+		}
+	}
+
 	fmt.Printf("[%s] Processing %s migrations...\n", mod, dbType)
 
 	// Ensure applied directory exists
@@ -143,7 +109,9 @@ func applyMigrations(cfg *config.Config, mod, dbType string) error {
 
 	// Get database config
 	var db config.DBConfig
-	if dbType == "dbc" {
+	if dbConfig != nil {
+		db = *dbConfig
+	} else if dbType == "dbc" {
 		db = cfg.Databases.DBC
 	} else {
 		db = cfg.Databases.World
@@ -156,15 +124,32 @@ func applyMigrations(cfg *config.Config, mod, dbType string) error {
 		sqlFile := filepath.Join(migrationDir, migration)
 		appliedMarker := filepath.Join(appliedDir, migration+".applied")
 
-		// Check if already applied
-		markerInfo, err := os.Stat(appliedMarker)
-		if err == nil {
-			// Check if migration was modified after being applied
-			sqlInfo, err := os.Stat(sqlFile)
-			if err == nil && sqlInfo.ModTime().After(markerInfo.ModTime()) {
-				// Need to rollback and re-apply
-				fmt.Printf("  [modified] %s - rolling back and re-applying\n", migration)
+		// Check if already applied (unless force is true)
+		if !force {
+			markerInfo, err := os.Stat(appliedMarker)
+			if err == nil {
+				// Check if migration was modified after being applied
+				sqlInfo, err := os.Stat(sqlFile)
+				if err == nil && sqlInfo.ModTime().After(markerInfo.ModTime()) {
+					// Need to rollback and re-apply
+					fmt.Printf("  [modified] %s - rolling back and re-applying\n", migration)
 
+					rollbackFile := strings.TrimSuffix(sqlFile, ".sql") + ".rollback.sql"
+					if _, err := os.Stat(rollbackFile); err == nil {
+						if err := runSQLFile(db, rollbackFile); err != nil {
+							return fmt.Errorf("rollback %s: %w", migration, err)
+						}
+					}
+					os.Remove(appliedMarker)
+				} else {
+					skipped++
+					continue
+				}
+			}
+		} else {
+			// Force mode: rollback first if already applied
+			if _, err := os.Stat(appliedMarker); err == nil {
+				fmt.Printf("  [force] %s - rolling back and re-applying\n", migration)
 				rollbackFile := strings.TrimSuffix(sqlFile, ".sql") + ".rollback.sql"
 				if _, err := os.Stat(rollbackFile); err == nil {
 					if err := runSQLFile(db, rollbackFile); err != nil {
@@ -172,9 +157,6 @@ func applyMigrations(cfg *config.Config, mod, dbType string) error {
 					}
 				}
 				os.Remove(appliedMarker)
-			} else {
-				skipped++
-				continue
 			}
 		}
 
@@ -201,6 +183,12 @@ func applyMigrations(cfg *config.Config, mod, dbType string) error {
 
 // rollbackMigrations rolls back migrations for a single mod and db type
 func rollbackMigrations(cfg *config.Config, mod, dbType string, all bool) error {
+	return rollbackMigrationsFromDatabase(cfg, mod, dbType, nil, all)
+}
+
+// rollbackMigrationsFromDatabase rolls back migrations for a single mod and db type from a specific database
+// If dbConfig is nil, uses the default database from config
+func rollbackMigrationsFromDatabase(cfg *config.Config, mod, dbType string, dbConfig *config.DBConfig, all bool) error {
 	migrationDir := filepath.Join(cfg.GetModsPath(), mod, dbType+"_sql")
 	appliedDir := filepath.Join(cfg.GetAppliedMigrationsPath(), mod, dbType)
 
@@ -218,7 +206,9 @@ func rollbackMigrations(cfg *config.Config, mod, dbType string, all bool) error 
 
 	// Get database config
 	var db config.DBConfig
-	if dbType == "dbc" {
+	if dbConfig != nil {
+		db = *dbConfig
+	} else if dbType == "dbc" {
 		db = cfg.Databases.DBC
 	} else {
 		db = cfg.Databases.World

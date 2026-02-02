@@ -3,6 +3,7 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,10 @@ import (
 
 // Status shows the status of migrations and mods
 func Status(cfg *config.Config, args []string) error {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	modName := fs.String("mod", "", "Show status for specific mod only")
+	fs.Parse(args)
+
 	fmt.Println("=== Thorium Status ===")
 	fmt.Println()
 	fmt.Printf("Workspace: %s\n", cfg.WorkspaceRoot)
@@ -25,17 +30,35 @@ func Status(cfg *config.Config, args []string) error {
 		return fmt.Errorf("list mods: %w", err)
 	}
 
+	// Filter to specific mod if requested
+	if *modName != "" {
+		found := false
+		for _, m := range mods {
+			if m == *modName {
+				mods = []string{m}
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("mod not found: %s", *modName)
+		}
+	}
+
 	if len(mods) == 0 {
 		fmt.Println("No mods found in", cfg.GetModsPath())
 		fmt.Println("Run 'thorium create-mod <name>' to create one.")
 		return nil
 	}
 
-	fmt.Printf("Found %d mod(s):\n", len(mods))
-	for _, mod := range mods {
-		fmt.Printf("  - %s\n", mod)
+	// Only show mods list if not filtering to a specific mod
+	if *modName == "" {
+		fmt.Printf("Found %d mod(s):\n", len(mods))
+		for _, mod := range mods {
+			fmt.Printf("  - %s\n", mod)
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 
 	// Show migration status for each mod
 	appliedPath := cfg.GetAppliedMigrationsPath()
