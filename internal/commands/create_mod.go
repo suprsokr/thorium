@@ -16,11 +16,36 @@ import (
 // CreateMod creates a new mod with the standard directory structure
 func CreateMod(cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("create-mod", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Usage: thorium create-mod <mod-name>
+
+Create a new mod with the standard directory structure.
+
+Arguments:
+  <mod-name>    Name of the mod to create (required)
+                Must start with a letter and contain only letters, numbers, hyphens, and underscores
+                Reserved names: shared, mods, thorium, config, build
+
+The mod will be created with the following structure:
+  mods/<mod-name>/
+    ├── dbc_sql/         DBC database migrations
+    ├── world_sql/       World database migrations
+    ├── scripts/         TrinityCore C++ scripts
+    ├── server-patches/  TrinityCore source patches (.patch files)
+    ├── binary-edits/    Client binary patches (.json files)
+    ├── assets/          Files to copy to client directory
+    └── luaxml/          Client-side Lua/XML modifications
+
+Example:
+  thorium create-mod my-custom-mod
+`)
+	}
 	fs.Parse(args)
 
 	remaining := fs.Args()
 	if len(remaining) == 0 {
-		return fmt.Errorf("mod name required. Usage: thorium create-mod <mod-name>")
+		fs.Usage()
+		return fmt.Errorf("mod name required")
 	}
 
 	modName := remaining[0]
