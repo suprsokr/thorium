@@ -87,8 +87,47 @@ type OutputConfig struct {
 	LuaXMLMPQ string `json:"luaxml_mpq"`
 }
 
+// FindWorkspaceRoot searches up the directory tree to find the workspace root
+// (directory containing config.json)
+func FindWorkspaceRoot(startDir string) (string, error) {
+	dir, err := filepath.Abs(startDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve start directory: %w", err)
+	}
+
+	for {
+		configPath := filepath.Join(dir, "config.json")
+		if _, err := os.Stat(configPath); err == nil {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root
+			break
+		}
+		dir = parent
+	}
+
+	return "", fmt.Errorf("workspace root not found (no config.json found)")
+}
+
 // Load loads and parses the config file, expanding environment variables
 func Load(path string) (*Config, error) {
+	// If path is relative (default "./config.json"), search up directory tree
+	// Only search if it's the default relative path, not an explicit absolute path
+	if !filepath.IsAbs(path) && (path == "./config.json" || path == "config.json") {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("get current directory: %w", err)
+		}
+		workspaceRoot, err := FindWorkspaceRoot(cwd)
+		if err != nil {
+			return nil, fmt.Errorf("find workspace root: %w", err)
+		}
+		path = filepath.Join(workspaceRoot, "config.json")
+	}
+
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("resolve config path: %w", err)
