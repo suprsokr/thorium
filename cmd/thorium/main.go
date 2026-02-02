@@ -150,42 +150,6 @@ Commands:
   version            Show version information
   help               Show this help message
 
-Examples:
-  thorium init                          # Create new workspace in current directory
-  thorium search networking             # Search for mods related to networking
-  thorium search --tag lua-api          # Search for mods with specific tag
-  thorium search --tag ui --tag client-only  # Multiple tags (AND logic)
-  thorium search --name custom-packets  # Show details for specific mod
-  thorium search --tags                 # List all available tags
-  thorium get https://github.com/user/thorium-mod  # Install a mod from GitHub
-  thorium get https://github.com/user/repo --name my-mod  # Install with custom name
-  thorium get https://github.com/user/repo --update  # Update existing mod
-  thorium create-mod my-mod             # Create a new mod
-  thorium create-migration --mod my-mod --db world add_custom_npc
-  thorium create-migration --mod my-mod --db dbc add_custom_item
-  thorium create-script --mod my-mod --type spell fire_blast
-  thorium create-script --mod my-mod --type creature custom_vendor
-  thorium create-addon --mod my-mod MyAddon   # Create addon in mod
-  thorium build                         # Full build all mods
-  thorium build --mod custom-weapon     # Build specific mod
-  thorium build --force                 # Reapply patches even if already applied
-  thorium apply --mod custom-weapon     # Apply migrations only
-  thorium export                        # Export DBCs only
-  thorium extract --dbc                 # Extract DBCs from client
-  thorium import dbc                    # Import DBCs to database
-  thorium import dbc --source /path     # Import from custom path
-  thorium import dbc --database mydb    # Import to specific database
-  thorium dist                          # Create player distribution zip
-  thorium dist --mod my-mod             # Distribution for specific mod
-  thorium dist --no-exe                 # Skip including wow.exe
-  thorium status                        # Show migration status
-
-Script Types:
-  spell              SpellScript (for custom spell behavior)
-  creature           CreatureScript (for custom NPC AI/gossip)
-  server             ServerScript (for server-wide hooks)
-  packet             ServerScript for custom packet handling
-
 Mod Structure:
   mods/<mod>/dbc_sql/         SQL migrations for DBC database
   mods/<mod>/world_sql/       SQL migrations for World database
